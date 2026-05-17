@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eoio"
+dynamic = ["version"]
+description = "Earth Observation IO: readers for EO data products"
+readme = "README.md"
+license-files = ["LICENSE"]
+authors = [{name = "MetEOR Toolkit Team", email = "team@comet-toolkit.org"}]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "numpy>=2.4,<3",
+    "xarray>=2025.12,<2026",
+    "pydantic>=2",
+    "processor_tools>=0.2.3",
+    "obsarray",
+    "matplotlib",
+    "scipy",
+    "pyproj>=3.6",
+    "shapely>=2.0",
+    "rasterio>=1.3",
+    "rioxarray>=0.15",
+    "xmltodict",
+    "dask",
+    "cfgrib",
+    "s2_rut_python",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "pytest-html",
+    "pytest-cov",
+    "ipython",
+]
+docs = [
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx_book_theme",
+    "sphinx_design",
+    "sphinx_automodapi",
+    "myst_parser",
+]
+
+[tool.setuptools.packages.find]
+include = ["eoio*"]
+
+[tool.setuptools_scm]
+# version inferred from git tags (e.g. v0.1.0); no extra config needed
+
+[tool.mypy]
+allow_untyped_globals = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["eoio.tests.*", "eoio.*.tests.*"]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["eoio", "tests"]
+
+[tool.ruff]
+line-length = 120
+exclude = ["docs"]
+
+[tool.ruff.lint]
+extend-ignore = ["W291"]
+
+[tool.ruff.lint.per-file-ignores]
+"eoio/__init__.py" = ["E402", "F401"]

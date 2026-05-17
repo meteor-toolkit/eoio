@@ -1,0 +1,5 @@
+sphinx_design
+sphinx_book_theme
+sphinx-rtd-theme
+ipython
+sphinx_autosummary_accessors
