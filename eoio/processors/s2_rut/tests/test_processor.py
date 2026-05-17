@@ -68,13 +68,13 @@ class TestS2RutRun(unittest.TestCase):
     def test_run_raises_type_error_for_non_dataset(self):
         proc = S2Rut(params={"data_vars": ["B02"], "group_unc": True})
 
-        with patch("eoio.processors.s2_rut.processor.S2RUTTool") as mock_tool_cls:
+        with patch("s2_rut_python.interface.S2RUTTool") as mock_tool_cls:
             with self.assertRaises(TypeError):
                 proc.run("not a dataset")
 
         mock_tool_cls.assert_not_called()
 
-    @patch("eoio.processors.s2_rut.processor.S2RUTTool")
+    @patch("s2_rut_python.interface.S2RUTTool")
     def test_run_calls_rut_tool_with_config(self, mock_tool_cls):
         proc = S2Rut(params={"data_vars": ["B02"], "group_unc": False})
         ds_in = xr.Dataset({"B02": ("x", [1.0, 2.0])}, coords={"x": [0, 1]})
