@@ -7,7 +7,7 @@ Developer Guide
 ###############
 
 In this developer guide, you will find detailed guidelines and
-examples that will guide you through the process of contributing to eoio.
+examples for contributing to *eoio*.
 
 
 .. toctree::
@@ -16,3 +16,4 @@ examples that will guide you through the process of contributing to eoio.
    contributing
    readers/readers
    processors/processors
+   controlled_vocabulary
