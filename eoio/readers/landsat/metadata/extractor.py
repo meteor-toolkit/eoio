@@ -59,7 +59,9 @@ class LSMetadataExtractor(BaseMetadataExtractor):
 
         :returns: Dictionary of basic product metadata.
         """
-        res = [self._band_gsds.get(band) for band in MEAS_VAR_BAND_IDS.keys() if self._band_gsds.get(band) is not None]
+        res = [
+            int(self._band_gsds.get(band)) for band in MEAS_VAR_BAND_IDS.keys() if self._band_gsds.get(band) is not None
+        ]
         geoms = [f"{r}m" for r in res]
 
         basic_md = {
@@ -186,8 +188,9 @@ class LSMetadataExtractor(BaseMetadataExtractor):
         rescaling = self.xml_reader.get_radiometric_rescaling()
         band_rescaling = rescaling.get(var, {})
 
-        # GSD per band (JSON)
-        res = self._band_gsds.get(var)
+        # GSD per band (JSON) — convert to int so resolution values and dimension
+        # names are integers everywhere ("30m" not "30.0m", 30 not 30.0)
+        res = int(self._band_gsds.get(var))
         geom = f"{res}m"
 
         # Thermal constants if applicable (XML)
