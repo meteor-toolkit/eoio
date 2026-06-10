@@ -90,7 +90,7 @@ class TestLandsatLayout(unittest.TestCase):
             p = self._make_landsat(Path(td), band_tokens=["1", "2"])
             layout = LandsatLayout(str(p))
             tokens = layout.available_band_tokens()
-            self.assertEqual(tokens, {"1", "2"})
+            self.assertEqual(tokens, {"B1", "B2"})
 
     def test_tif_band_files_ReturnsFiles(self):
         with TemporaryDirectory() as td:
@@ -99,6 +99,18 @@ class TestLandsatLayout(unittest.TestCase):
             files = layout.tif_band_files(meas_vars=["B1"])
             self.assertIn("B1", files)
             self.assertTrue(files["B1"].endswith(".TIF"))
+
+    def test_tif_band_files_B1DoesNotMatchB10OrB11(self):
+        with TemporaryDirectory() as td:
+            p = self._make_landsat(Path(td), band_tokens=["1", "10", "11"])
+            layout = LandsatLayout(str(p))
+            files = layout.tif_band_files(meas_vars=["B1", "B10", "B11"])
+            self.assertIn("B1", files)
+            self.assertIn("B10", files)
+            self.assertIn("B11", files)
+            self.assertTrue(Path(files["B1"]).stem.endswith("_B1"))
+            self.assertTrue(Path(files["B10"]).stem.endswith("_B10"))
+            self.assertTrue(Path(files["B11"]).stem.endswith("_B11"))
 
     def test_tif_band_files_RaisesIfNoneFound(self):
         with TemporaryDirectory() as td:

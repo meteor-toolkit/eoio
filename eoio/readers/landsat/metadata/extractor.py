@@ -247,12 +247,17 @@ class LSMetadataExtractor(BaseMetadataExtractor):
 
         :returns: Dictionary of angle variable metadata.
         """
+        # Each angle has a unique measurand so the stack processor never groups
+        # multiple angles together (group size < 2 → skipped).  Using a shared
+        # "angle" measurand would cause all four to be stacked into a single cube
+        # on the same band_30m dimension as the reflectance bands, which corrupts
+        # the reflectance cube via xarray coordinate alignment.
         angle_vars = {
             "solar_zenith_angle": {
                 "units": "degrees",
                 "long_name": "Solar Zenith Angle",
                 "standard_name": "solar_zenith_angle",
-                "measurand": "angle",
+                "measurand": "solar_zenith_angle",
                 "geometry_id": "30m",
                 "spatial_resolution": 30,
                 "spatial_resolution_units": "m",
@@ -263,7 +268,7 @@ class LSMetadataExtractor(BaseMetadataExtractor):
                 "units": "degrees",
                 "long_name": "Solar Azimuth Angle",
                 "standard_name": "solar_azimuth_angle",
-                "measurand": "angle",
+                "measurand": "solar_azimuth_angle",
                 "geometry_id": "30m",
                 "spatial_resolution": 30,
                 "spatial_resolution_units": "m",
@@ -274,7 +279,7 @@ class LSMetadataExtractor(BaseMetadataExtractor):
                 "units": "degrees",
                 "long_name": "Viewing Zenith Angle",
                 "standard_name": "sensor_zenith_angle",
-                "measurand": "angle",
+                "measurand": "viewing_zenith_angle",
                 "geometry_id": "30m",
                 "spatial_resolution": 30,
                 "spatial_resolution_units": "m",
@@ -285,7 +290,7 @@ class LSMetadataExtractor(BaseMetadataExtractor):
                 "units": "degrees",
                 "long_name": "Viewing Azimuth Angle",
                 "standard_name": "sensor_azimuth_angle",
-                "measurand": "angle",
+                "measurand": "viewing_azimuth_angle",
                 "geometry_id": "30m",
                 "spatial_resolution": 30,
                 "spatial_resolution_units": "m",
