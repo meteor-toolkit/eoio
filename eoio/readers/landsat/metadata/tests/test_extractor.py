@@ -113,8 +113,8 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.assertEqual(basic["product_name"], "LC08_L1TP_190030_20250519_20250519_02_T1")
         self.assertEqual(basic["platform"], "LANDSAT_8")
         self.assertEqual(basic["epsg"], 32630)
-        self.assertIn(30.0, basic["spatial_resolution"])
-        self.assertIn("30.0m", basic["geometry_ids"])
+        self.assertIn(30, basic["spatial_resolution"])
+        self.assertIn("30m", basic["geometry_ids"])
         self.assertIn("footprint", basic)
         self.assertIsInstance(basic["footprint"], dict)
         self.assertEqual(basic["footprint"]["crs"], "EPSG:32630")
@@ -132,7 +132,7 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.assertEqual(vm_b2["radiance_mult"], 0.0123)
         self.assertEqual(vm_b2["reflectance_mult"], 0.0001)
         self.assertEqual(vm_b2["band_central_wavelength"], 482.0)
-        self.assertEqual(vm_b2["spatial_resolution"], 30.0)
+        self.assertEqual(vm_b2["spatial_resolution"], 30)
 
         # B10: Thermal
         vm_b10 = self.extractor.get_variable_product_metadata("B10")
