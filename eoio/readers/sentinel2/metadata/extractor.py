@@ -192,8 +192,13 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
         elif var in ANGLE_VARS:
             basic_metadata["standard_name"] = var
             basic_metadata["long_name"] = var.replace("_", " ")
-            basic_metadata["measurand"] = "angle"
             basic_metadata["units"] = "degrees"
+            if var.startswith("viewing_zenith"):
+                basic_metadata["measurand"] = "viewing_zenith_angle"
+            elif var.startswith("viewing_azimuth"):
+                basic_metadata["measurand"] = "viewing_azimuth_angle"
+            else:
+                basic_metadata["measurand"] = "angle"
 
         elif var in set(AUX_ECMWF_VARS_OLD + AUX_ECMWF_VARS_NEW + AUX_CAMS_VARS):
             # Preserve CF-compliant attrs read from AUX GRIB files (e.g. tcwv)

@@ -206,6 +206,64 @@ class TestS2MSIReader(unittest.TestCase):
         return reader
 
 
+class TestListSelectedAuxObservationGeometry(unittest.TestCase):
+    """Unit tests for the observation_geometry dynamic aux group."""
+
+    _ALL_ANGLES = [
+        "viewing_zenith_angle_B02",
+        "viewing_azimuth_angle_B02",
+        "viewing_zenith_angle_B03",
+        "viewing_azimuth_angle_B03",
+        "viewing_zenith_angle_B04",
+        "viewing_azimuth_angle_B04",
+        "solar_zenith_angle",
+        "solar_azimuth_angle",
+    ]
+
+    def _make_reader(self, meas_bands, available_aux=None):
+        reader = object.__new__(S2MSIReader)
+        if available_aux is None:
+            available_aux = self._ALL_ANGLES
+        reader.aux_def = {"all": available_aux, "observation_geometry": []}
+        reader.meas_def = {"all": meas_bands}
+        reader.config = SimpleNamespace(vars_sel={"aux": "observation_geometry", "meas": meas_bands})
+        return reader
+
+    def test_returns_viewing_angles_for_selected_bands(self):
+        reader = self._make_reader(["B02", "B03"])
+        result = reader.list_selected_aux()
+        self.assertIn("viewing_zenith_angle_B02", result)
+        self.assertIn("viewing_azimuth_angle_B02", result)
+        self.assertIn("viewing_zenith_angle_B03", result)
+        self.assertIn("viewing_azimuth_angle_B03", result)
+
+    def test_excludes_angles_for_unrequested_bands(self):
+        reader = self._make_reader(["B02"])
+        result = reader.list_selected_aux()
+        self.assertNotIn("viewing_zenith_angle_B03", result)
+        self.assertNotIn("viewing_azimuth_angle_B03", result)
+
+    def test_always_includes_solar_angles(self):
+        reader = self._make_reader(["B02"])
+        result = reader.list_selected_aux()
+        self.assertIn("solar_zenith_angle", result)
+        self.assertIn("solar_azimuth_angle", result)
+
+    def test_skips_vars_not_in_available_aux(self):
+        # Only B02 viewing zenith available, not azimuth
+        reader = self._make_reader(
+            ["B02"],
+            available_aux=["viewing_zenith_angle_B02", "solar_zenith_angle", "solar_azimuth_angle"],
+        )
+        result = reader.list_selected_aux()
+        self.assertIn("viewing_zenith_angle_B02", result)
+        self.assertNotIn("viewing_azimuth_angle_B02", result)
+
+    def test_observation_geometry_key_present_in_aux_def(self):
+        reader = self._make_reader(["B02"])
+        self.assertIn("observation_geometry", reader.aux_def)
+
+
 class TestS2MSIReaderData(unittest.TestCase):
     def test_real_safe(self):
         safe_path = Path(SAFE_PATH)
