@@ -184,6 +184,28 @@ class LandsatReader(BaseRasterReader):
                 chunks=rp.get("chunks", None),
             )
 
+        # Apply band coverage mask to angle variables.
+        # Landsat angle TIFs have no nodata tag; out-of-scene edge pixels use
+        # DN=0, which overlaps with valid nadir values (VZA~0 at scene centre),
+        # so zeros cannot be masked directly.  Derive the valid-pixel footprint
+        # from a co-registered reflectance band instead.
+        if meas_vars and self.resolved_config.vars_sel.get("aux"):
+            angle_vars_in_ds = [v for v in ANGLE_OPTIONS if v in ds]
+            if angle_vars_in_ds:
+                angle_x_dim = next(
+                    (c for c in ds[angle_vars_in_ds[0]].dims if isinstance(c, str) and c.startswith("x_")),
+                    None,
+                )
+                if angle_x_dim:
+                    ref_band = next(
+                        (b for b in meas_vars if b in ds and angle_x_dim in ds[b].dims),
+                        None,
+                    )
+                    if ref_band is not None:
+                        valid = ~ds[ref_band].isnull()
+                        for av in angle_vars_in_ds:
+                            ds[av] = ds[av].where(valid)
+
         if mtd_level is True:
             mtd_level = "all"
         if isinstance(mtd_level, str) and mtd_level.lower() in ("all", "basic"):
