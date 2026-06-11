@@ -54,7 +54,10 @@ class S2MSIReader(BaseRasterReader):
 
         self.mask_def = {"all": []}  # MASK_OPTIONS,
 
-        self.aux_def = {"all": get_available_aux(self.layout)}
+        self.aux_def = {
+            "all": get_available_aux(self.layout),
+            "observation_geometry": [],  # key exists for options listing only; resolved dynamically in list_selected_aux
+        }
 
         # Initalise the metadata extractor
         self.mtd = S2MSIMetadataExtractor(self)
@@ -93,6 +96,22 @@ class S2MSIReader(BaseRasterReader):
             image_crs_epsg=image_crs,
             image_bounds=None,
         ).run()
+
+    def list_selected_aux(self):
+        if self.config.vars_sel.get("aux") == "observation_geometry":
+            available = set(self.aux_def["all"])
+            meas_bands = self.list_selected_meas()
+            vars = []
+            for band in meas_bands:
+                for angle_type in ("viewing_zenith_angle", "viewing_azimuth_angle"):
+                    var = f"{angle_type}_{band}"
+                    if var in available:
+                        vars.append(var)
+            for solar_var in ("solar_zenith_angle", "solar_azimuth_angle"):
+                if solar_var in available:
+                    vars.append(solar_var)
+            return vars
+        return super().list_selected_aux()
 
     def open_dataset(self) -> xr.Dataset:
         """Open the Sentinel-2 dataset as xarray.Dataset according to the request parameters."""

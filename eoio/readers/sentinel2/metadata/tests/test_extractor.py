@@ -431,12 +431,18 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         prod.find_reflectance_offsets.return_value = {}
 
         ex = S2MSIMetadataExtractor(reader)
-        md = ex.get_variable_basic_metadata("solar_zenith_angle")
 
+        md = ex.get_variable_basic_metadata("solar_zenith_angle")
         self.assertEqual(md["units"], "degrees")
         self.assertEqual(md["standard_name"], "solar_zenith_angle")
         self.assertEqual(md["measurand"], "angle")
         self.assertEqual(md["long_name"], "solar zenith angle")
+
+        md = ex.get_variable_basic_metadata("viewing_zenith_angle_B02")
+        self.assertEqual(md["measurand"], "viewing_zenith_angle")
+
+        md = ex.get_variable_basic_metadata("viewing_azimuth_angle_B02")
+        self.assertEqual(md["measurand"], "viewing_azimuth_angle")
 
     @patch(
         "eoio.readers.sentinel2.metadata.extractor.BaseMetadataExtractor.__init__",
