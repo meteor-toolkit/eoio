@@ -13,7 +13,7 @@ ProcessorPipelineError
 
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple, Union
 from eoio.processors.registry import PROCESSOR_REGISTRY
 import xarray as xr
 from processor_tools import Context
@@ -42,7 +42,9 @@ class ProcessorPipeline:
     --------------------
 
     :param processor_params:
-        Mapping of processor names to their specific parameter dictionaries.
+        Either a dict or a list of single-key dicts mapping processor names to
+        their parameter dictionaries. The list form allows the same processor
+        to appear more than once with different parameters.
 
         The on_missing parameter can be used to specify how to handle errors for each processor, supported values are:
         - "error" (default): processor pipeline is stopped returning most recent successful processed dataset
@@ -55,23 +57,26 @@ class ProcessorPipeline:
 
     Example
     -------
+    # Dict form (each processor once):
     processor_params = {
         "processor_name_0": {param_0:..., param_1:...., "on_missing":"skip"},
         "processor_name_1": {param_0:..., param_1:...., "on_missing":"error"}
-        }
+    }
 
-    context = {...}
-
-    processed_ds = ProcessorPipeline(processor_params: Dict[str, Dict[str, Any]], context: Dict[str, Any]).run(ds: xr.Dataset)
+    # List form (allows repeated processors):
+    processor_params = [
+        {"interpolate": {param_0:..., "on_missing": "skip"}},
+        {"interpolate": {param_0:..., "on_missing": "error"}},
+    ]
     """
 
     def __init__(
         self,
-        processor_params: Dict[str, Dict[str, Any]],
+        processor_params: Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]],
         context: Dict[str, Any] | Context,
     ) -> None:
 
-        self.processor_params: Dict[str, Dict[str, Any]] = processor_params
+        self.steps: List[Tuple[str, Dict[str, Any]]] = self._normalise(processor_params)
         self.context: Dict[str, Any] = context
         self.processors: list[Any] = []
         self.registry_lc = {name.lower(): name for name in PROCESSOR_REGISTRY}
@@ -79,10 +84,28 @@ class ProcessorPipeline:
         self._validate_processor_names()
         self._instantiate_processors()
 
+    @staticmethod
+    def _normalise(
+        processor_params: Union[Dict[str, Dict[str, Any]], List[Dict[str, Any]]],
+    ) -> List[Tuple[str, Dict[str, Any]]]:
+        """Normalise dict or list-of-single-key-dicts to an ordered list of (name, params) tuples."""
+        if isinstance(processor_params, dict):
+            return [(name, params) for name, params in processor_params.items()]
+        steps = []
+        for item in processor_params:
+            if not isinstance(item, dict) or len(item) != 1:
+                raise ProcessorPipelineError(
+                    "Each entry in a list-form processors definition must be a single-key dict, "
+                    f'e.g. {{"interpolate": {{...}}}}. Got: {item!r}'
+                )
+            name, params = next(iter(item.items()))
+            steps.append((name, params))
+        return steps
+
     def _validate_processor_names(self) -> None:
         """Ensure all referenced processors exist in the registry."""
 
-        for processor_name in self.processor_params:
+        for processor_name, _ in self.steps:
             if processor_name.lower() not in self.registry_lc:
                 raise ProcessorPipelineError(
                     f"Unknown processor: {processor_name}, available processors are {sorted(PROCESSOR_REGISTRY.keys())}"
@@ -91,10 +114,10 @@ class ProcessorPipeline:
     def _instantiate_processors(self) -> None:
         """Create processor instances with parameters."""
 
-        for processor_name in self.processor_params:
+        for processor_name, params in self.steps:
             registry_name = self.registry_lc[processor_name.lower()]
             cls = PROCESSOR_REGISTRY[registry_name]
-            processor_instance = cls(self.processor_params[processor_name], self.context)  # init processor
+            processor_instance = cls(params, self.context)
             self.processors.append(processor_instance)
 
     def run(self, ds: xr.Dataset) -> xr.Dataset:
@@ -111,24 +134,23 @@ class ProcessorPipeline:
 
         logger.info(msg="Starting processor pipeline...")
         current_ds = ds
-        processor_names = list(self.processor_params)
-        for i, processor in enumerate(self.processors, start=0):
+        for i, (processor, (step_name, _)) in enumerate(zip(self.processors, self.steps)):
             try:
-                logger.info(f"Running processor {i + 1}: {processor_names[i]}")
+                logger.info(f"Running processor {i + 1}: {step_name}")
                 current_ds = processor.run(current_ds)
             except Exception as e:
                 params = getattr(processor, "params", {})  # check if params exists
 
                 on_missing = str(object=params.get("on_missing", "error")).lower()  # "error" | "skip"
-                logger.error(msg=f"Error in processor {processor_names[i]}: {e}")
+                logger.error(msg=f"Error in processor {step_name}: {e}")
 
                 if on_missing == "skip":
-                    logger.warning(msg=f"Skipping processor {processor_names[i]} (index {i}) due to error: {e}")
+                    logger.warning(msg=f"Skipping processor {step_name} (index {i}) due to error: {e}")
                     # Continue without altering current_ds
                     continue
 
                 # Default behaviour: raise a pipeline error
-                raise ProcessorPipelineError(f"Error in {processor_names[i]}: {e}") from e
+                raise ProcessorPipelineError(f"Error in {step_name}: {e}") from e
 
         logger.info("Pipeline completed successfully.")
         return current_ds
