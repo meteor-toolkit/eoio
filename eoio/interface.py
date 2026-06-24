@@ -1,6 +1,6 @@
 """eoio.interface - interface functions module"""
 
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional, Union
 import xarray as xr
 import os
 from processor_tools import Context
@@ -23,7 +23,7 @@ def read(
     vars_sel: Optional[Dict[str, List[str]]] = None,
     subset: Optional[Dict[str, Any]] = None,
     read_params: Optional[Dict[str, Any]] = None,
-    processors: Optional[Dict[str, Any]] = None,
+    processors: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
     *args,
     **kwargs,
 ) -> xr.Dataset:

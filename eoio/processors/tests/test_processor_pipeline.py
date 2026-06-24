@@ -27,6 +27,37 @@ class TestProcessorPipeline(unittest.TestCase):
                 process_pipeline.ProcessorPipeline(params, self.context)
 
     # -------------------------------------------------------------------------
+    # LIST FORM
+    # -------------------------------------------------------------------------
+
+    def test_list_form_allows_duplicates(self):
+        mock_cls = MagicMock()
+        mock_inst = MagicMock()
+        mock_inst.run.return_value = self.ds
+        mock_cls.return_value = mock_inst
+
+        params = [
+            {"proc": {"x": 1}},
+            {"proc": {"x": 2}},
+        ]
+
+        with patch.dict(
+            f"{process_pipeline.__name__}.PROCESSOR_REGISTRY",
+            {"proc": mock_cls},
+            clear=True,
+        ):
+            pipeline = process_pipeline.ProcessorPipeline(params, self.context)
+            pipeline.run(self.ds)
+
+        self.assertEqual(mock_cls.call_count, 2)
+
+    def test_invalid_list_form_raises(self):
+        params = [{"a": {}}, {"b": {}, "c": {}}]  # invalid: second item has 2 keys
+
+        with self.assertRaises(process_pipeline.ProcessorPipelineError):
+            process_pipeline.ProcessorPipeline(params, self.context)
+
+    # -------------------------------------------------------------------------
     # INSTANTIATION
     # -------------------------------------------------------------------------
 
@@ -81,6 +112,7 @@ class TestProcessorPipeline(unittest.TestCase):
             def __init__(self, params, context):
                 self.var = params["var"]
                 self.value = params["value"]
+                self.params = params
 
             def run(self, ds):
                 out = ds.copy()
@@ -91,22 +123,24 @@ class TestProcessorPipeline(unittest.TestCase):
             def __init__(self, params, context):
                 self.old = params["old"]
                 self.new = params["new"]
+                self.params = params
 
             def run(self, ds):
                 return ds.rename({self.old: self.new})
 
         reg = {"add": Add, "rename": Ren}
 
-        params = {
-            "add": {"var": "B02", "value": 10},
-            "rename": {"old": "B02", "new": "B06"},
-        }
+        params = [
+            {"add": {"var": "B02", "value": 10}},
+            {"add": {"var": "B02", "value": 5}},
+            {"rename": {"old": "B02", "new": "B06"}},
+        ]
 
         with patch.dict(f"{process_pipeline.__name__}.PROCESSOR_REGISTRY", reg, clear=True):
             pipeline = process_pipeline.ProcessorPipeline(params, self.context)
             out = pipeline.run(self.ds)
 
-        xr.testing.assert_allclose(out["B06"], self.ds["B02"] + 10)
+        xr.testing.assert_allclose(out["B06"], self.ds["B02"] + 15)
         self.assertIn("B03", out)
 
     # -------------------------------------------------------------------------
@@ -190,7 +224,7 @@ class TestProcessorPipeline(unittest.TestCase):
 
         class OK:
             def __init__(self, params, context):
-                pass
+                self.params = params
 
             def run(self, ds):
                 return ds.assign_attrs(success=True)
