@@ -239,7 +239,7 @@ class BaseSubsetResolver(ABC):
         values = np.asarray(self.data.values).ravel()
 
         # Compute absolute differences once
-        if values.dtype == "datetime64[ns]":
+        if np.issubdtype(values.dtype, np.datetime64):
             diffs = np.abs(convert_datetime(values) - self.variable)
         else:
             diffs = np.abs(values - self.variable)
