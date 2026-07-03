@@ -19,6 +19,22 @@ __author__ = "Maddie Stedman <maddie.stedman@npl.co.uk>"
 __all__ = []
 
 
+def _strip_archive_suffixes(path: str) -> str:
+    """
+    Strip archive suffixes from a path so nested archives like .tar.gz resolve to the product root.
+
+    :param path: archive path.
+    :returns: path without archive suffixes.
+    """
+    archive_suffixes = {".tar", ".gz", ".bz2", ".xz", ".tgz", ".tbz", ".tbz2", ".txz"}
+    root = path
+
+    while True:
+        root, suffix = os.path.splitext(root)
+        if suffix.lower() not in archive_suffixes:
+            return root + suffix
+
+
 @contextmanager  # type: ignore[arg-type]
 def setup_file(path: str, read_params: Optional[dict]) -> None:  # type: ignore[misc]
     """
@@ -74,7 +90,7 @@ def extract_file(path: str, read_params: Optional[dict] = None) -> Tuple[str, Op
     if os.path.splitext(path)[-1] == extension:
         path_extracted = path
     else:
-        path_extracted = os.path.join(os.path.splitext(path)[0] + extension)
+        path_extracted = os.path.join(_strip_archive_suffixes(path) + extension)
 
     if not os.path.exists(path_extracted):  # check if already extracted
         if tarfile.is_tarfile(path) or zipfile.is_zipfile(path):

@@ -213,6 +213,34 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
     @patch("eoio.utils.read_utils.os.path.exists")
+    def test_extract_file_tar_gz(
+        self,
+        mock_path_exists,
+        mock_is_tarfile,
+        mock_is_zipfile,
+        mock_extract_zipped_file,
+        mock_extract_tarred_file,
+        mock_get_reader,
+    ):
+        mock_path_exists.return_value = False
+        mock_is_tarfile.return_value = True
+        mock_is_zipfile.return_value = False
+        mock_get_reader.return_value.get_extension.return_value = ""
+
+        test_path, test_read_params, test_extracted = extract_file("path_string.tar.gz")
+
+        self.assertIsNone(test_read_params)
+        self.assertEqual("path_string", test_path)
+        self.assertTrue(test_extracted)
+        mock_extract_tarred_file.assert_called_once_with("path_string.tar.gz", "path_string")
+        mock_extract_zipped_file.assert_not_called()
+
+    @patch("eoio.readers.factory.ReaderFactory.get_reader")
+    @patch("eoio.utils.read_utils.extract_tarred_file")
+    @patch("eoio.utils.read_utils.extract_zipped_file")
+    @patch("eoio.utils.read_utils.zipfile.is_zipfile")
+    @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_exists(
         self,
         mock_path_exists,
