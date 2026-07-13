@@ -88,11 +88,6 @@ Never commit with Claud as a co-author
    ```bash
    git push meteor release:main
    ```
-4. Move the `v*` tag to the latest release commit and force-push:
-   ```bash
-   git tag -f v<X.Y> <commit>
-   git push meteor v<X.Y> --force
-   ```
 
 ### PyPI publishing
 

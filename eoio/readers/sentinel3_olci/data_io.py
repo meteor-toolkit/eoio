@@ -9,6 +9,7 @@ Functions follow Sphinx/reST docstring conventions (``:param:``,
 """
 
 import xarray as xr
+import obsarray  # noqa: F401 - registers the obsarray xarray accessor
 from typing import List, Dict, Any, Optional, Tuple
 
 

@@ -182,7 +182,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
                 basic_metadata["units"] = "1"
 
             anc_vars = []
-            for anc_var in self.reader.aux_def:
+            for anc_var in self.reader.aux_def.get("all", []):
                 if ("solar" in anc_var) or (var in anc_var):
                     anc_vars.append(anc_var)
 

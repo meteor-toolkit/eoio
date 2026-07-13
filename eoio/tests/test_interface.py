@@ -10,9 +10,12 @@ from eoio.interface import (
     # product_bounds,
     read,
     process,
+    product_processors,
     # write,
 )
+from eoio.processors.registry import PROCESSOR_REGISTRY
 from eoio.readers.base import BaseReader
+import eoio.processors  # noqa: F401 - ensures all built-in processors are registered
 
 __author__ = [
     "Sam Hunt <sam.hunt@npl.co.uk>",
@@ -67,6 +70,13 @@ class TestInterface(unittest.TestCase):
 
         mock_extract_file.assert_called_once_with("path_string", None)
         mock_path_exists.assert_called_once_with("path_string")
+
+    def test_product_processors_does_not_raise_for_any_registered_processor(self):
+        """Regression test: every registered processor must define `_all_options`."""
+        info = product_processors("unused_path")
+        self.assertEqual(set(info), set(PROCESSOR_REGISTRY))
+        for name, cls in PROCESSOR_REGISTRY.items():
+            self.assertIs(info[name], cls._all_options)
 
     @mock.patch("eoio.interface.ProcessorPipeline")
     def test_process(self, processor_pipeline_mock):
