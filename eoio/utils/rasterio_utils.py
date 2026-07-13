@@ -20,6 +20,7 @@ class RasterChunkHint:
 def suggest_raster_chunks(
     path: str,
     *,
+    group: str = None,
     target_mb: float = 32.0,
     max_mb: float = 128.0,
     min_blocks: int = 1,
@@ -47,7 +48,10 @@ def suggest_raster_chunks(
         real_src = src
         if getattr(src, "count", 0) == 0 and getattr(src, "subdatasets", None):
             try:
-                real_src = rasterio.open(src.subdatasets[0])
+                if group is None:
+                    real_src = rasterio.open(src.subdatasets[0])
+                else:
+                    real_src = rasterio.open([sds for sds in src.subdatasets if group in sds][0])
             except Exception:
                 real_src = src
 

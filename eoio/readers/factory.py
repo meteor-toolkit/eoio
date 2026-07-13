@@ -44,6 +44,8 @@ class ReaderFactory:
         CAMS_pattern = re.compile(r"CAMS*.*")
         FLOX_pattern = re.compile(r".*.FLOX*.*")
         nc_pattern = re.compile(r".*.nc")
+        modis_terra_pattern = re.compile(r"MOD.*")
+        modis_aqua_pattern = re.compile(r"MOD.*")
         # > Check if input product_path matches any known product regular expressions
         #   return parsingFactory as appropriate
         if re.search(S2MSIL1C_pattern, path):
@@ -106,6 +108,16 @@ class ReaderFactory:
 
             return EMITL1BReader
 
+        elif re.search(modis_terra_pattern, path):
+            from eoio.readers.modis.reader import MODISReader
+
+            return MODISReader
+
+        elif re.search(modis_aqua_pattern, path):
+            from eoio.readers.modis.reader import MODISReader
+
+            return MODISReader
+
         elif re.search(ERA5_pattern, path):
             from eoio.readers.era5.reader import ERA5Reader
 
@@ -114,6 +126,7 @@ class ReaderFactory:
             from eoio.readers.generic_netcdf.reader import NetCDFReader
 
             return NetCDFReader
+
         else:
             raise ValueError(f"Provided file given in path does not match any known product formats. Path: {path}.")
 

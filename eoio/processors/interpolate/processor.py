@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from processor_tools import BaseProcessor
 import xarray as xr
 from eoio.processors.registry import register_processor
+import numpy as np
+from scipy.interpolate import griddata
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class InterpolateConfig:
     """
 
     coords: Sequence[str]
+    interpolate_mode: str
     target_grid: Sequence
     data_vars: Optional[Sequence[str]] = None
     method: str = "linear"
@@ -116,6 +119,15 @@ class Interpolate(BaseProcessor):
 
         coords = params["coords"]
 
+        if any([("x" in c) or ("y" in c) for c in coords]):
+            interpolate_mode = "xy"
+        elif any([("latitude" in c) or ("longitude" in c) for c in coords]):
+            interpolate_mode = "lat_lon"
+        else:
+            raise ValueError(
+                "interpolate: unable to determine interpolation mode from 'coords' parameter. Expected coordinate names to contain 'x_'/'y_' for xy interpolation or 'latitude'/'longitude' for lat/lon interpolation."
+            )
+
         # resolve "target_grid" param
         if "target_grid" not in params:
             raise ValueError("interpolate: missing required param 'target_grid' (e.g. ['x_60m']).")
@@ -149,6 +161,7 @@ class Interpolate(BaseProcessor):
             method=method,
             inplace=inplace,
             on_missing=on_missing,
+            interpolate_mode=interpolate_mode,
         )
 
     def _format_target_grid(self, ds: xr.Dataset, target_grid: Sequence) -> Sequence:
@@ -198,9 +211,9 @@ class Interpolate(BaseProcessor):
         # Format the coordinates
         return coords
 
-    def run(self, ds: xr.Dataset) -> xr.Dataset:
+    def _run_xy(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
         """
-        Run interpolation on the dataset.
+        Run interpolation on x/y coordinates.
 
         :param ds:
             Input dataset.
@@ -208,13 +221,7 @@ class Interpolate(BaseProcessor):
             Output dataset with interpolated variables.
         """
 
-        if not isinstance(ds, xr.Dataset):
-            raise TypeError("interpolate: input must be an xarray.Dataset.")
-
-        coords = self._format_coords(ds, self.interpolate_config.coords)
-        target_coords = self._format_target_grid(ds, self.interpolate_config.target_grid)
-        # find all data variables that have any of the interpolation coords as a dimension
-        vars_with_coord = [str(name) for name, da in ds.data_vars.items() if set(coords).intersection(da.dims)]
+        vars_with_coord = [name for name, da in ds.data_vars.items() if set(coords).intersection(da.dims)]
         # choose which variables to interpolate based on 'data_vars' config (if provided), otherwise use all variables with the interpolation coords as dimensions
         if self.interpolate_config.data_vars:
             vars_to_interpolate = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
@@ -364,6 +371,176 @@ class Interpolate(BaseProcessor):
         for coord, target_coord in zip(coords, target_coords):
             if isinstance(target_coord, (xr.DataArray, str)) and coord not in ds.dims:
                 ds = ds.reset_coords(names=coord, drop=True)
+
+        return ds
+
+    def _run_lat_lon(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
+        """
+        Run interpolation on latitude/longitude coordinates.
+
+        :param ds:
+            Input dataset.
+        :return:
+            Output dataset with interpolated variables.
+        """
+        vars_with_coord = [
+            var
+            for var in ds.data_vars
+            if set([item for c in coords for item in ds[c].dims]).intersection(set(ds[var].dims))
+        ]
+
+        # choose which variables to interpolate based on 'data_vars' config (if provided), otherwise use all variables with the interpolation coords as dimensions
+        if self.interpolate_config.data_vars:
+            vars_to_interpolate = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
+        else:
+            vars_to_interpolate = vars_with_coord
+
+            # if inplace is False, create new variables with '_interp' suffix and assign them to the dataset, and also create new coordinates with '_interp' suffix, then interpolate in place on the new variables.
+        if not self.interpolate_config.inplace:
+            # Check if we have list-of-coordinate-names targets (vs custom grids)
+            has_list_of_coords = any(
+                isinstance(tc, list) and all(isinstance(item, xr.DataArray) for item in tc) for tc in target_coords
+            )
+
+            if has_list_of_coords:
+                # Add new placeholder coordinates for each target in target_coords
+                placeholder_coords = {}  # Maps old coord name to list of placeholder names
+
+                for coord, target_coord in zip(coords, target_coords):
+                    if isinstance(target_coord, list) and all(isinstance(item, xr.DataArray) for item in target_coord):
+                        # Create a placeholder for each target in the list
+                        placeholders = [f"{coord}_interp_{i}" for i in range(len(target_coord))]
+                        for placeholder in placeholders:
+                            ds = ds.assign_coords({placeholder: ds[coord]})
+                        placeholder_coords[coord] = placeholders
+                    else:
+                        # Single target or custom grid, use standard _interp suffix
+                        ds = ds.assign_coords({coord + "_interp": ds[coord]})
+                        placeholder_coords[coord] = [coord + "_interp"]
+
+                # For each variable to interpolate, create new versions with swapped dims
+                for var in vars_to_interpolate:
+                    old_var = ds[var]
+                    # Build complete dimension mapping for all placeholders at once
+                    max_placeholders = max(len(p) for p in placeholder_coords.values())
+
+                    for i in range(max_placeholders):
+                        # Build full dim mapping for this interpolation step
+                        dim_mapping = {}
+                        for coord, placeholders in placeholder_coords.items():
+                            if coord in old_var.dims and i < len(placeholders):
+                                dim_mapping[coord] = placeholders[i]
+
+                        if dim_mapping:  # Only create if there are dimensions to map
+                            new_var = old_var.swap_dims(dim_mapping)
+                            ds[f"{var}_interp_{i}"] = new_var
+
+                # Update coords and vars_to_interpolate to use the new placeholders and interpolated vars
+                new_coords = []
+                new_vars_to_interpolate = []
+                for coord, placeholders in placeholder_coords.items():
+                    new_coords.append(placeholders)
+                for var in vars_to_interpolate:
+                    for i in range(max(len(p) for p in placeholder_coords.values())):
+                        new_vars_to_interpolate.append(f"{var}_interp_{i}")
+                coords = new_coords
+                vars_to_interpolate = new_vars_to_interpolate
+            else:
+                # Custom grids: use simpler logic with single _interp suffix
+                inplace_coords = {coord + "_interp": ds[coord] for coord in coords}
+                ds = ds.assign_coords(coords=inplace_coords)
+
+                # For each variable to interpolate, create a new version with swapped dims
+                for var in vars_to_interpolate:
+                    old_var = ds[var]
+                    # Swap dims: replace old coord names with new coord names
+                    dim_mapping = {coord: coord + "_interp" for coord in coords if coord in old_var.dims}
+                    new_var = old_var.swap_dims(dim_mapping)
+                    # Add to dataset with _interp suffix
+                    ds[var + "_interp"] = new_var
+
+                coords = [coord + "_interp" for coord in coords]
+                vars_to_interpolate = [var + "_interp" for var in vars_to_interpolate]
+
+        # If inplace is True, interpolate on the original variables.
+
+        # Build list of (coord, target_coord) pairs, expanding lists of coordinate names only
+        interpolation_pairs = {}
+        interpolation_groups = []  # To track which coords belong together for lat/lon interpolation
+        using_indexed_placeholders = any(
+            isinstance(tc, list) and all(isinstance(item, xr.DataArray) for item in tc) for tc in target_coords
+        )
+
+        for coord, target_coord in zip(coords, target_coords):
+            if isinstance(target_coord, list) and all(isinstance(item, xr.DataArray) for item in target_coord):
+                # List of coordinate names: expand into individual pairs
+                for individual_coord, individual_target in zip(coord, target_coord):
+                    interpolation_pairs[individual_coord] = individual_target
+            else:
+                # Single target (string or custom grid): add as-is
+                interpolation_pairs[coord] = target_coord
+
+        for coord, target_coord in interpolation_pairs.items():
+            if "latitude" in coord:
+                interpolation_groups.append(
+                    (
+                        [coord, coord.replace("latitude", "longitude")],
+                        [target_coord, interpolation_pairs.get(coord.replace("latitude", "longitude"))],
+                    )
+                )
+
+        # perform interpolation
+        for cs, tcs in interpolation_groups:
+            points = np.column_stack((ds[cs[1]].values.ravel(), ds[cs[0]].values.ravel()))
+            lon_target = tcs[1].values
+            lat_target = tcs[0].values
+            for var in vars_to_interpolate:
+                values = ds[var].values.ravel()
+                target_resolution = tcs[0].name.split("_")[-1]
+
+                mask = ~np.isnan(values)
+                points_valid = points[mask]
+                values_valid = values[mask]
+
+                interp_data = griddata(
+                    points_valid, values_valid, (lon_target, lat_target), method=self.interpolate_config.method
+                )
+
+                ds[var] = (("y_grid_" + target_resolution, "x_grid_" + target_resolution), interp_data)
+
+                if not self.interpolate_config.inplace:
+                    ds = ds.rename({var: f"{var.split('_interp', 1)[0]}_{target_resolution}"})
+
+        # clean up dataset, removing placeholder coords
+        for coord, target_coord in zip(coords, target_coords):
+            if isinstance(target_coord, (xr.DataArray, str)) and coord not in ds.dims:
+                ds = ds.reset_coords(names=coord, drop=True)
+
+        return ds
+
+    def run(self, ds: xr.Dataset) -> xr.Dataset:
+        """
+        Run interpolation on the dataset.
+
+        :param ds:
+            Input dataset.
+        :return:
+            Output dataset with interpolated variables.
+        """
+
+        if not isinstance(ds, xr.Dataset):
+            raise TypeError("interpolate: input must be an xarray.Dataset.")
+
+        context: Mapping[str, Any] = self.context or {}
+
+        coords = self._format_coords(ds, self.interpolate_config.coords)
+        target_coords = self._format_target_grid(ds, self.interpolate_config.target_grid)
+        if self.interpolate_config.interpolate_mode == "xy":
+            ds = self._run_xy(ds, coords, target_coords)
+        elif self.interpolate_config.interpolate_mode == "lat_lon":
+            ds = self._run_lat_lon(ds, coords, target_coords)
+        else:
+            raise ValueError("interpolate: invalid 'interpolate_mode'. Expected 'xy' or 'lat_lon'.")
         # Record processing history
         ds = self._record_provenance(ds)
 
