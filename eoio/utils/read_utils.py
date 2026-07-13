@@ -26,7 +26,7 @@ def _strip_archive_suffixes(path: str) -> str:
     :param path: archive path.
     :returns: path without archive suffixes.
     """
-    archive_suffixes = {".tar", ".gz", ".bz2", ".xz", ".tgz", ".tbz", ".tbz2", ".txz"}
+    archive_suffixes = {".tar", ".gz", ".bz2", ".xz", ".tgz", ".tbz", ".tbz2", ".txz", ".zip"}
     root = path
 
     while True:
