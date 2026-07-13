@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Union
 import numpy as np
 
 
@@ -20,7 +20,7 @@ class RasterChunkHint:
 def suggest_raster_chunks(
     path: str,
     *,
-    group: str = None,
+    group: Union[str | None] = None,
     target_mb: float = 32.0,
     max_mb: float = 128.0,
     min_blocks: int = 1,

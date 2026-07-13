@@ -132,9 +132,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             Dictionary containing basic variable metadata.
         """
 
-        ancillary_vars = []
-
-        basic_metadata = {
+        basic_metadata: dict[str, object] = {
             "units": "",
             "long_name": "",
             "standard_name": "",
@@ -150,7 +148,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
                 basic_metadata["long_name"] = "BOA HCRF"
                 basic_metadata["units"] = "1"
 
-            anc_vars = []
+            anc_vars: list[str] = []
             for anc_var in self.reader.aux_def:
                 if ("solar" in anc_var) or (var in anc_var):
                     anc_vars.append(anc_var)

@@ -4,13 +4,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from pathlib import Path
 import xarray as xr
-from eoio.deps import lazy_rioxarray
 from eoio.readers.base import BaseRasterReader
 from eoio.readers.modis.layout import MODISLayout
 from eoio.readers.modis.metadata.extractor import MODISMetadataExtractor
 from eoio.readers.modis.aux_vars.aux_data import get_available_aux
 from eoio.readers.modis.data_io import read_bands_into_dataset
-from eoio.readers.modis.aux_vars.aux_data import get_available_aux, add_aux
+from eoio.readers.modis.aux_vars.aux_data import add_aux
 from eoio.readers.subset.roi_subset import ROISubsetResolver, ResolvedROISubset
 from eoio.utils.rasterio_utils import suggest_raster_chunks
 
@@ -43,11 +42,12 @@ class MODISReader(BaseRasterReader):
         read_params: Optional[Dict[str, Any]] = None,
     ) -> None:
 
-        self.path = str(path)
+        path_str = str(path)
+        self.path = Path(path_str)
 
         # Initialise MODIS layout
         self.layout = MODISLayout(
-            path,
+            path_str,
             preferred_resolution=read_params.get("preferred_resolution") if read_params else None,
             geolocation_dir=read_params.get("geolocation_dir") if read_params else None,
         )
@@ -121,7 +121,7 @@ class MODISReader(BaseRasterReader):
         if "03" in str(geolocation_path):
             chunks = (
                 suggest_raster_chunks(
-                    self.layout.geolocation_path(),
+                    str(self.layout.geolocation_path()),
                     group="/HDFEOS/SWATHS/MODIS_Swath_Type_GEO/Geolocation_Fields",
                     target_mb=32.0,
                 )
@@ -137,7 +137,7 @@ class MODISReader(BaseRasterReader):
             if self.layout.proc_version == "7":
                 chunks = (
                     suggest_raster_chunks(
-                        self.layout.geolocation_path(),
+                        str(self.layout.geolocation_path()),
                         group="/HDFEOS/SWATHS/MODIS_SWATH_Type_L1B/Geolocation_Fields",
                         target_mb=32.0,
                     )

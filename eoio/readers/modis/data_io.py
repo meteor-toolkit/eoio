@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 import numpy as np
-from shapely import Polygon, contains_xy
 import xarray as xr
 
 from eoio.deps import lazy_rioxarray
@@ -38,11 +37,6 @@ def read_bands_into_dataset(
 ) -> xr.Dataset:
 
     rxr = lazy_rioxarray()
-
-    # ------------------------------------------------------------------
-    # Product metadata
-    # ------------------------------------------------------------------
-    prod_mtd = mtd.product_metadata or {}
 
     # ------------------------------------------------------------------
     # Set up chunking

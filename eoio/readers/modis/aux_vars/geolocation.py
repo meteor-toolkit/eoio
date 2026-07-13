@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 from typing import List
-from eoio.readers.modis.metadata.extractor import MODISMetadataExtractor
 import xarray as xr
 
 FILE_RES_LIST = ["1000m", "500m", "250m"]

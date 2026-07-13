@@ -1,7 +1,7 @@
 """eoio.readers.modis.aux_vars.aux_data - auxiliary data reading functions for MODIS reader"""
 
 from __future__ import annotations
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 import warnings
 from eoio.readers.base import ReaderConfig
 import xarray as xr
@@ -67,17 +67,19 @@ def add_aux(
     # divide vars into types for processing
     angle_names = [x for x in ANGLE_VARS if x in aux_names]
     atmos_names = [x for x in ATMOS_VARS if x in aux_names]
-    remaining_vars = [x for x in aux_names if x not in angle_names and x not in atmos_names]
+    # remaining_vars = [x for x in aux_names if x not in angle_names and x not in atmos_names]
 
     ang_ds = xr.open_dataset(
         layout.geolocation_path(), group="/HDFEOS/SWATHS/MODIS_Swath_Type_GEO/Data Fields", chunks=chunks
     )
+    atmos_ds: Optional[xr.DataArray] = None
+    atmos_names_to_use: Optional[list[str]] = atmos_names if layout.processing_level == "L2" else None
     if layout.processing_level == "L2":
         rxr = lazy_rioxarray()
         atmos_ds = rxr.open_rasterio(layout.path, chunks=chunks)[0]
     else:
         atmos_ds = None
-        atmos_names = None
+        atmos_names_to_use = None
         warnings.warn(
             f"Atmospheric variables {atmos_names} requested but not available for processing level {layout.processing_level}"
         )
@@ -90,11 +92,11 @@ def add_aux(
             mtd=mtd,
         )
 
-    if atmos_names:
+    if atmos_names_to_use:
         ds = add_atmos(
             ds=ds,
-            aux_ds=atmos_ds,
-            atmos_names=atmos_names,
+            aux_ds=cast(xr.Dataset, atmos_ds),
+            atmos_names=atmos_names_to_use,
             mtd=mtd,
         )
 
