@@ -285,7 +285,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
     ):
         """Test get_variable_basic_metadata for L1C measurement band with ancillary vars."""
         reader = self._make_reader_with_layout()
-        reader.aux_def = ["solar_zenith_angle_B02", "view_zenith_angle"]
+        reader.aux_def = {"all": ["solar_zenith_angle_B02", "view_zenith_angle"]}
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
@@ -329,7 +329,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
     ):
         """Test get_variable_basic_metadata for L2A measurement band."""
         reader = self._make_reader_with_layout()
-        reader.aux_def = []
+        reader.aux_def = {"all": []}
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
@@ -372,7 +372,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
     ):
         """Test get_variable_basic_metadata for non-measurement variable (AOT, WVP, etc)."""
         reader = self._make_reader_with_layout()
-        reader.aux_def = []
+        reader.aux_def = {"all": []}
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
@@ -415,7 +415,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
     ):
         """Angle variables should expose populated standard metadata."""
         reader = self._make_reader_with_layout()
-        reader.aux_def = []
+        reader.aux_def = {"all": []}
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
@@ -461,7 +461,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
     ):
         """AUX GRIB vars should not be overwritten by empty metadata placeholders."""
         reader = self._make_reader_with_layout()
-        reader.aux_def = ["tcwv"]
+        reader.aux_def = {"all": ["tcwv"]}
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
@@ -547,13 +547,15 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         """Test that ancillary variables are correctly matched for a band."""
         reader = self._make_reader_with_layout()
         # Multiple ancillary vars, some matching B03, some with "solar"
-        reader.aux_def = [
-            "solar_zenith_angle",
-            "solar_azimuth_angle",
-            "view_zenith_angle_B03",
-            "view_azimuth_angle_B03",
-            "wind_speed",
-        ]
+        reader.aux_def = {
+            "all": [
+                "solar_zenith_angle",
+                "solar_azimuth_angle",
+                "view_zenith_angle_B03",
+                "view_azimuth_angle_B03",
+                "wind_speed",
+            ]
+        }
 
         prod = mock_prod_cls.return_value
         ds = mock_ds_cls.return_value
