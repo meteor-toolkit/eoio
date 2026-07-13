@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional
 import os
-import re
 
 
 class MODISLayoutError(ValueError):
@@ -61,7 +60,7 @@ class MODISLayout:
     Solely responsible for filesystem/path logic. No heavy dependencies.
     """
 
-    path: str
+    path: str | Path
     preferred_resolution: Optional[int] = None
     geolocation_dir: Optional[Path | str] = None
 
@@ -81,7 +80,7 @@ class MODISLayout:
         :return:
             Processing version.
         """
-        return os.path.split(self.path)[-1].split(".")[3]
+        return int(os.path.split(self.path)[-1].split(".")[3])
 
     @property
     def modis_dir(self) -> Path:
@@ -144,11 +143,9 @@ class MODISLayout:
             return Path(self.path)
 
         if self.geolocation_dir is None:
-            aux_dir = str(self.modis_dir).replace("D09", "D03")
+            aux_dir = Path(str(self.modis_dir).replace("D09", "D03"))
         else:
-            aux_dir = self.geolocation_dir
-
-        aux_dir = Path(aux_dir)
+            aux_dir = Path(self.geolocation_dir)
 
         aux_name = f"{self.modis_platform}03." + ".".join(os.path.split(self.path)[-1].split(".")[1:3])
         cands = sorted(aux_dir.glob(f"{aux_name}*"))

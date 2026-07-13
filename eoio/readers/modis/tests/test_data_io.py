@@ -143,7 +143,7 @@ class TestReadBandsIntoDataset(unittest.TestCase):
         mock_add_geoloc.side_effect = lambda ds, **kwargs: ds
 
         ds = xr.Dataset()
-        result = read_bands_into_dataset(
+        _ = read_bands_into_dataset(
             ds=ds,
             geolocation_ds=self.geolocation_ds,
             layout=self.layout,

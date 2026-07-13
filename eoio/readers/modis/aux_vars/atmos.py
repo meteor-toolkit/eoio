@@ -3,10 +3,8 @@
 from __future__ import annotations
 from typing import List
 from eoio.readers.modis.metadata.extractor import MODISMetadataExtractor
-import numpy as np
 import xarray as xr
 
-from eoio.readers.subset.roi_subset import ResolvedROISubset
 
 ATMOS_DICT = {
     "TCWV": "1km water_vapor",

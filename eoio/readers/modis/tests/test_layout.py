@@ -130,7 +130,7 @@ class TestMODISLayout(unittest.TestCase):
         with TemporaryDirectory() as td:
             p = self._make_modis_product(Path(td), product_name="MOD02HDF.A2020001.0000.061.2020002121530.hdf")
             layout = MODISLayout(str(p))
-            self.assertEqual(layout.proc_version, "061")
+            self.assertEqual(layout.proc_version, 61)
 
     def test_default_meas_vars_returns_36_bands_for_1km(self):
         """Test that default_meas_vars returns 36 bands for 1km resolution."""

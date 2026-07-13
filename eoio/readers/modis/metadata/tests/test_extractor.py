@@ -1,7 +1,7 @@
 """eoio.readers.modis.metadata.tests.test_metadata - tests for eoio.readers.modis.metadata"""
 
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 from eoio.readers.modis.metadata.extractor import MODISMetadataExtractor
 
 

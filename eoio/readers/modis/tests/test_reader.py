@@ -1,7 +1,7 @@
 """eoio.readers.modis.tests.test_reader - unit tests for eoio.readers.modis.reader"""
 
 import unittest
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock
 from types import SimpleNamespace
 import xarray as xr
 from eoio.readers.modis.reader import MODISReader
@@ -103,7 +103,7 @@ class TestMODISReader(unittest.TestCase):
         ds1 = xr.Dataset({"Band 1": (("y", "x"), [[1]])})
         mock_read_bands.return_value = ds1
 
-        result = reader.open_dataset()
+        _ = reader.open_dataset()
 
         # Should call read_bands_into_dataset
         mock_read_bands.assert_called_once()

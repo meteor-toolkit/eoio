@@ -224,7 +224,7 @@ class Interpolate(BaseProcessor):
         vars_with_coord = [name for name, da in ds.data_vars.items() if set(coords).intersection(da.dims)]
         # choose which variables to interpolate based on 'data_vars' config (if provided), otherwise use all variables with the interpolation coords as dimensions
         if self.interpolate_config.data_vars:
-            vars_to_interpolate = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
+            vars_to_interpolate: Sequence = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
         else:
             vars_to_interpolate = vars_with_coord
 
@@ -253,6 +253,7 @@ class Interpolate(BaseProcessor):
 
                 # For each variable to interpolate, create new versions with swapped dims
                 for var in vars_to_interpolate:
+                    var = str(var)
                     old_var = ds[var]
                     # Build complete dimension mapping for all placeholders at once
                     max_placeholders = max(len(p) for p in placeholder_coords.values())
@@ -285,6 +286,7 @@ class Interpolate(BaseProcessor):
 
                 # For each variable to interpolate, create a new version with swapped dims
                 for var in vars_to_interpolate:
+                    var = str(var)
                     old_var = ds[var]
                     # Swap dims: replace old coord names with new coord names
                     dim_mapping = {coord: coord + "_interp" for coord in coords if coord in old_var.dims}
@@ -292,8 +294,8 @@ class Interpolate(BaseProcessor):
                     # Add to dataset with _interp suffix
                     ds[var + "_interp"] = new_var
 
-                coords = [coord + "_interp" for coord in coords]
-                vars_to_interpolate = [var + "_interp" for var in vars_to_interpolate]
+                coords = [str(coord) + "_interp" for coord in coords]
+                vars_to_interpolate = [str(var) + "_interp" for var in vars_to_interpolate]
 
         # If inplace is True, interpolate on the original variables.
 
@@ -328,6 +330,7 @@ class Interpolate(BaseProcessor):
                 ds = ds.interp(coords=interp_input, method=self.interpolate_config.method)  # type: ignore[arg-type]
             else:
                 for var in vars_to_interpolate:
+                    var = str(var)
                     # If using indexed placeholders, only interpolate variables with matching index
                     if coord_index is not None:
                         if "_interp_" not in var or not var.endswith(str(coord_index)):
@@ -336,12 +339,15 @@ class Interpolate(BaseProcessor):
         # rename new variables with resolution of new grid as suffix (e.g. "B02_interp_60m" instead of "B02_interp_0") - only if using coordinate-name lists
         if using_indexed_placeholders:
             for var in vars_to_interpolate:
+                var = str(var)
                 if "_interp_" in var:
                     # Extract the resolution from the target coordinate
                     target_resolution = None
                     for coord, target_coord in zip(coords, target_coords):
+                        coord = str(coord)
                         if isinstance(target_coord, list):
                             for individual_coord, individual_target in zip(coord, target_coord):
+                                individual_coord = str(individual_coord)
                                 if (
                                     isinstance(individual_target, (xr.DataArray, str))
                                     and (
@@ -391,7 +397,7 @@ class Interpolate(BaseProcessor):
 
         # choose which variables to interpolate based on 'data_vars' config (if provided), otherwise use all variables with the interpolation coords as dimensions
         if self.interpolate_config.data_vars:
-            vars_to_interpolate = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
+            vars_to_interpolate: Sequence = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
         else:
             vars_to_interpolate = vars_with_coord
 
@@ -420,6 +426,7 @@ class Interpolate(BaseProcessor):
 
                 # For each variable to interpolate, create new versions with swapped dims
                 for var in vars_to_interpolate:
+                    var = str(var)
                     old_var = ds[var]
                     # Build complete dimension mapping for all placeholders at once
                     max_placeholders = max(len(p) for p in placeholder_coords.values())
@@ -441,6 +448,7 @@ class Interpolate(BaseProcessor):
                 for coord, placeholders in placeholder_coords.items():
                     new_coords.append(placeholders)
                 for var in vars_to_interpolate:
+                    var = str(var)
                     for i in range(max(len(p) for p in placeholder_coords.values())):
                         new_vars_to_interpolate.append(f"{var}_interp_{i}")
                 coords = new_coords
@@ -452,6 +460,7 @@ class Interpolate(BaseProcessor):
 
                 # For each variable to interpolate, create a new version with swapped dims
                 for var in vars_to_interpolate:
+                    var = str(var)
                     old_var = ds[var]
                     # Swap dims: replace old coord names with new coord names
                     dim_mapping = {coord: coord + "_interp" for coord in coords if coord in old_var.dims}
@@ -460,16 +469,13 @@ class Interpolate(BaseProcessor):
                     ds[var + "_interp"] = new_var
 
                 coords = [coord + "_interp" for coord in coords]
-                vars_to_interpolate = [var + "_interp" for var in vars_to_interpolate]
+                vars_to_interpolate = [str(var) + "_interp" for var in vars_to_interpolate]
 
         # If inplace is True, interpolate on the original variables.
 
         # Build list of (coord, target_coord) pairs, expanding lists of coordinate names only
         interpolation_pairs = {}
         interpolation_groups = []  # To track which coords belong together for lat/lon interpolation
-        using_indexed_placeholders = any(
-            isinstance(tc, list) and all(isinstance(item, xr.DataArray) for item in tc) for tc in target_coords
-        )
 
         for coord, target_coord in zip(coords, target_coords):
             if isinstance(target_coord, list) and all(isinstance(item, xr.DataArray) for item in target_coord):
@@ -495,6 +501,7 @@ class Interpolate(BaseProcessor):
             lon_target = tcs[1].values
             lat_target = tcs[0].values
             for var in vars_to_interpolate:
+                var = str(var)
                 values = ds[var].values.ravel()
                 target_resolution = tcs[0].name.split("_")[-1]
 
@@ -531,7 +538,7 @@ class Interpolate(BaseProcessor):
         if not isinstance(ds, xr.Dataset):
             raise TypeError("interpolate: input must be an xarray.Dataset.")
 
-        context: Mapping[str, Any] = self.context or {}
+        # context: Mapping[str, Any] = self.context or {}
 
         coords = self._format_coords(ds, self.interpolate_config.coords)
         target_coords = self._format_target_grid(ds, self.interpolate_config.target_grid)

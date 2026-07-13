@@ -1,9 +1,8 @@
 """eoio.readers.modis.aux_vars.tests.test_aux_data - tests for eoio.readers.modis.aux_vars.aux_data"""
 
 import unittest
-from unittest.mock import MagicMock, Mock
-import xarray as xr
-from eoio.readers.modis.aux_vars.aux_data import get_available_aux, add_aux
+from unittest.mock import MagicMock
+from eoio.readers.modis.aux_vars.aux_data import get_available_aux
 
 
 class TestGetAvailableAux(unittest.TestCase):
