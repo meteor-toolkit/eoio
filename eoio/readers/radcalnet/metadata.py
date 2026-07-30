@@ -114,7 +114,7 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
 
         lat = self.ds.attrs["Lattitude"]
         lon = self.ds.attrs["Longitude"]
-        name = self.ds.attrs["Site"][0][0:4]
+        name = self.ds.attrs["Site"][0:4]
         basic_md = {
             "collection_name": f"{name} {self.ds.attrs['collection']}",
             "product_name": f"{name}_RadCalNet_L1",

@@ -32,11 +32,17 @@ def read_file(
     f.close()
 
     dims = ["wavelength", "time"]
+    # Site/Lat/Lon/Alt are single-valued header lines, but DATA[k] always
+    # parses to a list (see above) -- unwrap to scalars here, once, rather
+    # than leaving every consumer to remember to index [0] itself (see
+    # get_basic_metadata's WKT/product_bounds strings, which used to format
+    # the list's repr directly into the text, e.g. "POINT ([15.12] [-23.6])"
+    # instead of "POINT (15.12 -23.6)").
     attrs = {
-        "Site": DATA.pop("Site"),
-        "Lattitude": DATA.pop("Lat"),
-        "Longitude": DATA.pop("Lon"),
-        "Altitude": DATA.pop("Alt"),
+        "Site": DATA.pop("Site")[0],
+        "Lattitude": DATA.pop("Lat")[0],
+        "Longitude": DATA.pop("Lon")[0],
+        "Altitude": DATA.pop("Alt")[0],
     }
     data_vars: Dict[str, Any] = {
         "reflectance": (dims, []),
