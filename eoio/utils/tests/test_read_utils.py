@@ -254,6 +254,7 @@ class TestReadUtils(unittest.TestCase):
         mock_is_tarfile.return_value = True
         mock_is_zipfile.return_value = True
         mock_get_reader.return_value.get_extension.return_value = ""
+        mock_get_reader.return_value.default_read_params = {"save_extracted": False}
 
         test_path, test_read_params, test_extracted = extract_file("path_string")
         self.assertEqual("path_string", test_path)
@@ -261,6 +262,42 @@ class TestReadUtils(unittest.TestCase):
         self.assertFalse(test_extracted)
         mock_extract_tarred_file.assert_not_called()
         mock_extract_zipped_file.assert_not_called()
+
+    @patch("eoio.readers.factory.ReaderFactory.get_reader")
+    @patch("eoio.utils.read_utils.extract_tarred_file")
+    @patch("eoio.utils.read_utils.extract_zipped_file")
+    @patch("eoio.utils.read_utils.zipfile.is_zipfile")
+    @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.exists")
+    def test_extract_file_exists_reader_without_save_extracted_support(
+        self,
+        mock_path_exists,
+        mock_is_tarfile,
+        mock_is_zipfile,
+        mock_extract_zipped_file,
+        mock_extract_tarred_file,
+        mock_get_reader,
+    ):
+        """Regression test: extract_file() used to unconditionally set
+        read_params["save_extracted"] = True whenever a product was already extracted,
+        regardless of whether the resolved reader even has a save_extracted concept (e.g.
+        RadCalNet's ascii-based reader doesn't). Since setup_file()'s context manager only
+        yields the path (not the mutated read_params) when the caller's own read_params dict
+        was originally None, this mutation was invisible for the simplest call pattern, but
+        silently reappeared -- in place, since dicts are mutable -- whenever the caller
+        passed a real (non-None) read_params dict, breaking every subsequent read_params
+        validation for readers that don't support save_extracted."""
+        mock_path_exists.return_value = True
+        mock_is_tarfile.return_value = True
+        mock_is_zipfile.return_value = True
+        mock_get_reader.return_value.get_extension.return_value = ""
+        mock_get_reader.return_value.default_read_params = {"metadata_level": "all"}
+
+        test_path, test_read_params, test_extracted = extract_file("path_string", {"metadata_level": "all"})
+        self.assertEqual("path_string", test_path)
+        self.assertDictEqual(test_read_params, {"metadata_level": "all"})
+        self.assertNotIn("save_extracted", test_read_params)
+        self.assertFalse(test_extracted)
 
     @patch("eoio.readers.factory.ReaderFactory.get_reader")
     @patch("eoio.utils.read_utils.extract_tarred_file")
