@@ -20,7 +20,7 @@ Functions
 from __future__ import annotations
 import xarray as xr
 import os.path
-from eoio.readers.era5.subset import build_subset
+from eoio.readers.ecmwf.subset import build_subset
 from eoio.readers.generic_netcdf.data_io import read_dataset
 
 # from eoio.readers.hypernets.aux import maybe_add_aux
