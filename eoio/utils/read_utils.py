@@ -108,7 +108,8 @@ def extract_file(path: str, read_params: Optional[dict] = None) -> Tuple[str, Op
     else:
         if not read_params:
             read_params = {}
-        read_params["save_extracted"] = True
+        if "save_extracted" in reader.default_read_params:
+            read_params["save_extracted"] = True
 
     return path_extracted, read_params, extract_bool
 
