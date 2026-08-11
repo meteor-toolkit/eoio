@@ -4,6 +4,24 @@ eoio.readers.radcalnet.reader
 
 In situ data reader implementation for RadCalNet.
 
+RadCalNet's own ascii format uses short, abbreviated column headers (e.g.
+``P``, ``WV``, ``esd``); this reader translates them to descriptive
+snake_case names at read time, matching every other reader in eoio. See
+``eoio.readers.radcalnet.data_io.AUX_COLUMN_NAMES`` for the exact mapping.
+
+Aux variables (``aux_def["all"]``), with units:
+
+- ``air_pressure`` -- surface air pressure (hPa)
+- ``air_temperature`` -- air temperature (K)
+- ``water_vapour`` -- total column water vapour (g cm-2)
+- ``ozone`` -- total column ozone (DU)
+- ``aerosol_optical_depth`` -- aerosol optical depth at 550 nm (dimensionless)
+- ``angstrom_exponent`` -- Angstrom exponent (dimensionless)
+- ``aerosol_type`` -- site-specific categorical aerosol type code
+- ``earth_sun_distance`` -- Earth-Sun distance (AU); ``RadCalNetReader`` (TOA) only,
+  not available on ``RadCalNetInputReader`` (BOA)
+- ``solar_zenith_angle`` / ``solar_azimuth_angle`` -- solar geometry (degree)
+
 Classes
 -------
 .. autosummary::
@@ -85,14 +103,14 @@ class RadCalNetReader(BaseReader):
 
     aux_def = {
         "all": [
-            "P",
-            "T",
-            "WV",
-            "O3",
-            "AOD",
-            "Ang",
-            "Type",
-            "esd",
+            "air_pressure",
+            "air_temperature",
+            "water_vapour",
+            "ozone",
+            "aerosol_optical_depth",
+            "angstrom_exponent",
+            "aerosol_type",
+            "earth_sun_distance",
             "solar_zenith_angle",
             "solar_azimuth_angle",
         ]
@@ -100,12 +118,12 @@ class RadCalNetReader(BaseReader):
 
     uncertainty_vars = [
         "reflectance_uncertainty",
-        "P_unc",
-        "T_unc",
-        "WV_unc",
-        "O3_unc",
-        "AOD_unc",
-        "Ang_unc",
+        "air_pressure_uncertainty",
+        "air_temperature_uncertainty",
+        "water_vapour_uncertainty",
+        "ozone_uncertainty",
+        "aerosol_optical_depth_uncertainty",
+        "angstrom_exponent_uncertainty",
     ]
 
     def __init__(
@@ -169,16 +187,22 @@ class RadCalNetReader(BaseReader):
         # get metadata
         if "input" in self.get_extension():
             ds.attrs["collection"] = "Bottom of Atmosphere"
+            ds["reflectance"].attrs.update({"long_name": "BOA HCRF", "standard_name": "boa_reflectance"})
         elif "output" in self.get_extension():
             ds.attrs["collection"] = "Top of Atmosphere"
+            ds["reflectance"].attrs.update({"long_name": "TOA HCRF", "standard_name": "toa_reflectance"})
 
-        if self.config.read_params.get("metadata_level", None) == "original":
+        mtd_level = self.config.read_params.get("metadata_level", None)
+        if mtd_level is True:
+            mtd_level = "all"
+
+        if mtd_level == "original":
             return ds
         else:
             meta_ex = RadCalNetMetadataExtractor(self, ds)
             ds = meta_ex.clear_metadata(ds)
-            if self.config.read_params.get("metadata_level", None) in ("all", "basic"):
-                ds = meta_ex.attach_metadata(ds, level=self.config.read_params["metadata_level"])
+            if mtd_level in ("all", "basic"):
+                ds = meta_ex.attach_metadata(ds, level=mtd_level)
             return ds
 
     @staticmethod
@@ -233,13 +257,13 @@ class RadCalNetReader(BaseReader):
 class RadCalNetInputReader(RadCalNetReader):
     aux_def = {
         "all": [
-            "P",
-            "T",
-            "WV",
-            "O3",
-            "AOD",
-            "Ang",
-            "Type",
+            "air_pressure",
+            "air_temperature",
+            "water_vapour",
+            "ozone",
+            "aerosol_optical_depth",
+            "angstrom_exponent",
+            "aerosol_type",
         ]
     }
 

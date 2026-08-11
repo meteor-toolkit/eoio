@@ -109,7 +109,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             "processing_level": self.prod_xml_reader.find_processing_level(),
             "processing_version": self.prod_xml_reader.find_processing_baseline(),
             "spatial_resolution": res,
-            "geometry_id": geoms,
+            "geometry_ids": geoms,
             "geospatial_bounds": self.prod_xml_reader.find_bounds().wkt,
             "product_date": self.prod_xml_reader.find_product_start_date(),
             "description": "TBD",
@@ -236,12 +236,12 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": res,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": geom,
                     "band_central_wavelength": self.prod_xml_reader.find_band_central_wavelength(band_id),
-                    "band_central_wavelength_unit": "nm",
+                    "band_central_wavelength_units": "nm",
                     "solar_irradiance": self._solar_irradiance[band_id],
-                    "solar_irradiance_unit": self.prod_xml_reader.find_solar_irradiance_unit(),
+                    "solar_irradiance_units": self.prod_xml_reader.find_solar_irradiance_unit(),
                     "radiometric_offset": self._radiometric_offsets[var],
                     "physical_gains": self._physical_gains[band_id],
                     "band_id": band_id,
@@ -262,7 +262,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": res,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": geom,
                     "geoposition": self.tl_xml_reader.find_geoposition(res),
                 }
@@ -275,7 +275,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": res,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": geom,
                     "geoposition": self.tl_xml_reader.find_geoposition(10),
                 }
@@ -286,7 +286,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": 5000,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": "5000m",
                 }
             )

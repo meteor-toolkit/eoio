@@ -1,7 +1,9 @@
 import os.path
 from os import pardir
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 import numpy as np
 import xarray as xr
 import configparser
@@ -135,7 +137,7 @@ class testRadCalNetReader(unittest.TestCase):
         "Altitude": [510.0],
     }
     expected = {
-        "P": [
+        "air_pressure": [
             963.15,
             963.32,
             963.50,
@@ -150,7 +152,7 @@ class testRadCalNetReader(unittest.TestCase):
             961.63,
             961.48,
         ],
-        "T": [
+        "air_temperature": [
             297.1,
             300.5,
             303.1,
@@ -165,7 +167,7 @@ class testRadCalNetReader(unittest.TestCase):
             308.0,
             308.0,
         ],
-        "WV": [
+        "water_vapour": [
             0.62,
             0.63,
             0.64,
@@ -180,7 +182,7 @@ class testRadCalNetReader(unittest.TestCase):
             0.63,
             0.63,
         ],
-        "O3": [
+        "ozone": [
             312.0,
             312.0,
             312.0,
@@ -195,7 +197,7 @@ class testRadCalNetReader(unittest.TestCase):
             312.0,
             312.0,
         ],
-        "AOD": [
+        "aerosol_optical_depth": [
             0.032,
             0.031,
             0.03,
@@ -210,7 +212,7 @@ class testRadCalNetReader(unittest.TestCase):
             0.034,
             0.033,
         ],
-        "Ang": [
+        "angstrom_exponent": [
             0.952,
             0.963,
             0.974,
@@ -225,8 +227,8 @@ class testRadCalNetReader(unittest.TestCase):
             0.946,
             0.913,
         ],
-        "Type": ["R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R"],
-        "P_unc": [
+        "aerosol_type": ["R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R", "R"],
+        "air_pressure_uncertainty": [
             2.5,
             2.5,
             2.5,
@@ -241,8 +243,8 @@ class testRadCalNetReader(unittest.TestCase):
             2.5,
             2.5,
         ],
-        "T_unc": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-        "WV_unc": [
+        "air_temperature_uncertainty": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+        "water_vapour_uncertainty": [
             0.12,
             0.13,
             0.13,
@@ -257,8 +259,8 @@ class testRadCalNetReader(unittest.TestCase):
             0.13,
             0.13,
         ],
-        "O3_unc": [6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2],
-        "AOD_unc": [
+        "ozone_uncertainty": [6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2, 6.2],
+        "aerosol_optical_depth_uncertainty": [
             0.001,
             0.001,
             0.001,
@@ -273,7 +275,7 @@ class testRadCalNetReader(unittest.TestCase):
             0.001,
             0.001,
         ],
-        "Ang_unc": [
+        "angstrom_exponent_uncertainty": [
             0.017,
             0.017,
             0.017,
@@ -291,7 +293,7 @@ class testRadCalNetReader(unittest.TestCase):
     }
 
     expected_TOA = {
-        "esd": [
+        "earth_sun_distance": [
             1.01612,
             1.01612,
             1.01612,
@@ -362,6 +364,38 @@ class testRadCalNetReader(unittest.TestCase):
         assert ds.wavelength.values.shape[0] == 211
         assert ds.time.values.shape[0] == 13
 
+    def test_metadata_level_true_is_treated_as_all(self):
+        """metadata_level=True (bool) must attach metadata the same as metadata_level='all'.
+
+        Passing the Python bool True (as eomatch's own config does) previously fell through
+        both the "original" and ("all", "basic") checks in open_dataset(), so clear_metadata()
+        ran but attach_metadata() never did -- silently returning a dataset with every attrs
+        dict wiped to {}.
+        """
+        ds = xr.Dataset(
+            {
+                "reflectance": (["wavelength", "time"], np.zeros((2, 1))),
+                "reflectance_uncertainty": (["wavelength", "time"], np.zeros((2, 1))),
+            },
+            coords={"wavelength": [400.0, 410.0], "time": [np.datetime64("2021-02-08")]},
+        )
+        with tempfile.NamedTemporaryFile(suffix=".output") as tmp:
+            with (
+                patch("eoio.readers.radcalnet.reader.read_file", return_value=ds),
+                patch("eoio.readers.radcalnet.reader.build_subset", return_value=None),
+                patch("eoio.readers.radcalnet.reader.read_dataset", side_effect=lambda ds, include_vars, subset: ds),
+                patch("eoio.readers.radcalnet.reader.RadCalNetMetadataExtractor") as mock_extractor_cls,
+            ):
+                mock_extractor = mock_extractor_cls.return_value
+                mock_extractor.clear_metadata.side_effect = lambda ds: ds
+                mock_extractor.attach_metadata.side_effect = lambda ds, level: ds
+
+                reader = RadCalNetReader(tmp.name, read_params={"metadata_level": True})
+                reader.open_dataset()
+
+                mock_extractor.attach_metadata.assert_called_once()
+                self.assertEqual(mock_extractor.attach_metadata.call_args.kwargs["level"], "all")
+
     def test_wrong_file_type(self):
         if not os.path.exists(test_data_path):
             self.skipTest(f"Test .output data not found at {test_data_path}")
@@ -422,6 +456,125 @@ class testRadCalNetReader(unittest.TestCase):
         ds = output.open_dataset()
 
         assert ds.time.values.shape[0] == 5
+
+
+def _write_synthetic_ascii_file(suffix: str) -> str:
+    """Build a minimal but structurally-valid RadCalNet ascii file (self-contained, unlike
+    the other tests in this module which need T:\\ drive access) so the variable naming and
+    attrs behaviour of read_file()/open_dataset() can be regression-tested without real data.
+
+    ``esd`` (earth_sun_distance) is only written for ``.output`` (TOA) files: real ``.input``
+    (BOA) files don't carry it either -- RadCalNetInputReader.aux_def never selects it, so an
+    unselected "esd" row would otherwise fall through read_file()'s generic per-wavelength
+    fallback loop and fail float("esd")."""
+    n = 13
+
+    def row(v):
+        return "\t".join([str(v)] * n)
+
+    utc_times = [(datetime.datetime(2021, 1, 1, 8, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)]
+    local_times = [(datetime.datetime(2021, 1, 1, 9, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)]
+
+    lines = [
+        "Site:\tGONA01",
+        "Lat:\t-23.59999",
+        "Lon:\t15.119215",
+        "Alt:\t510.0",
+        "Year\t" + row("2021"),
+        "DOY(U)\t" + row("286"),
+        "UTC\t" + "\t".join(utc_times),
+        "DOY(L)\t" + row("286"),
+        "Local\t" + "\t".join(local_times),
+        "400\t" + row("0.30"),
+        "400\t" + row("0.01"),
+        "P\t" + row("963.15"),
+        "P\t" + row("2.5"),
+        "T\t" + row("297.1"),
+        "T\t" + row("0.5"),
+        "WV\t" + row("0.62"),
+        "WV\t" + row("0.13"),
+        "O3\t" + row("312.0"),
+        "O3\t" + row("6.2"),
+        "AOD\t" + row("0.032"),
+        "AOD\t" + row("0.001"),
+        "Ang\t" + row("0.952"),
+        "Ang\t" + row("0.017"),
+        "Zen\t" + row("40.1"),
+        "Azi\t" + row("120.5"),
+        "Type\t" + row("R"),
+    ]
+    if suffix == ".output":
+        lines.append("esd\t" + row("1.0161"))
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(lines))
+    return path
+
+
+class testVariableNamingAndAttrs(unittest.TestCase):
+    """Regression tests for RadCalNet's variable naming and CF-style attrs: the raw ascii
+    file's own abbreviated column headers (P, T, WV, ...) are translated to descriptive
+    names matching every other eoio reader, and every variable gets long_name/standard_name/
+    units (previously attached nowhere in the reading pipeline)."""
+
+    def setUp(self):
+        self.toa_path = _write_synthetic_ascii_file(".output")
+        self.boa_path = _write_synthetic_ascii_file(".input")
+
+    def tearDown(self):
+        os.unlink(self.toa_path)
+        os.unlink(self.boa_path)
+
+    def test_old_abbreviated_names_are_gone(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        for old_name in ("P", "T", "esd", "Type", "P_unc", "T_unc"):
+            self.assertNotIn(old_name, ds.variables)
+
+    def test_new_descriptive_names_present(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        for new_name in (
+            "air_pressure",
+            "air_temperature",
+            "earth_sun_distance",
+            "aerosol_type",
+            "air_pressure_uncertainty",
+        ):
+            self.assertIn(new_name, ds.variables)
+
+    def test_aux_variables_have_units_and_standard_name(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds["air_pressure"].attrs.get("units"), "hPa")
+        self.assertEqual(ds["air_pressure"].attrs.get("standard_name"), "air_pressure")
+        self.assertEqual(ds["air_temperature"].attrs.get("units"), "K")
+        self.assertEqual(ds["earth_sun_distance"].attrs.get("units"), "AU")
+
+    def test_uncertainty_variable_has_attrs(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds["air_pressure_uncertainty"].attrs.get("units"), "hPa")
+        self.assertIn("uncertainty", ds["air_pressure_uncertainty"].attrs.get("long_name", ""))
+
+    def test_wavelength_coordinate_has_units(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds["wavelength"].attrs.get("units"), "nm")
+
+    def test_reflectance_standard_name_is_toa_for_output_reader(self):
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds["reflectance"].attrs.get("standard_name"), "toa_reflectance")
+
+    def test_reflectance_standard_name_is_boa_for_input_reader(self):
+        ds = RadCalNetInputReader(self.boa_path).open_dataset()
+        self.assertEqual(ds["reflectance"].attrs.get("standard_name"), "boa_reflectance")
+
+    def test_collection_attr_survives_as_top_level_attr(self):
+        """Regression test: reader.py sets ds.attrs["collection"] before the metadata
+        extractor is constructed. clear_metadata() then wiped it, and since "collection"
+        wasn't a key in get_basic_metadata()'s output, it never came back at the top level --
+        only as a nested, easy-to-miss ds.attrs["product_metadata"]["collection"]."""
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds.attrs.get("collection"), "Top of Atmosphere")
+
+        ds = RadCalNetInputReader(self.boa_path).open_dataset()
+        self.assertEqual(ds.attrs.get("collection"), "Bottom of Atmosphere")
 
 
 if __name__ == "__main__":

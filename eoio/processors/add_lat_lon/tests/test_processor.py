@@ -123,6 +123,33 @@ class TestAddLatLonProcessor(unittest.TestCase):
 
         self.assertIn("latitude_10m", out.coords)
 
+    def test_run_adds_cf_attrs_to_lat_lon(self):
+        x = np.array([10.0, 20.0, 30.0])
+        y = np.array([0.0, 1.0])
+        vals = np.zeros((y.size, x.size))
+        ds = xr.Dataset({"val": (("y_10m", "x_10m"), vals)}, coords={"x_10m": x, "y_10m": y})
+        inst = AddLatLon(params={"geometry_id": ["10m"]})
+        with patch.object(
+            xr.Dataset,
+            "rio",
+            property(lambda self: SimpleNamespace(crs="EPSG:3857")),
+            create=True,
+        ):
+            with patch(
+                "eoio.processors.add_lat_lon.processor.lazy_pyproj",
+                return_value=_make_mock_pyproj(),
+            ):
+                out = inst.run(ds)
+
+        self.assertEqual(
+            out.coords["latitude_10m"].attrs,
+            {"standard_name": "latitude", "long_name": "latitude", "units": "degrees_north"},
+        )
+        self.assertEqual(
+            out.coords["longitude_10m"].attrs,
+            {"standard_name": "longitude", "long_name": "longitude", "units": "degrees_east"},
+        )
+
     def test_run_raises_on_non_dataset(self):
         inst = AddLatLon(params={})
         with self.assertRaises(TypeError):

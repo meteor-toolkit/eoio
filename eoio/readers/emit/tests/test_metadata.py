@@ -34,7 +34,9 @@ class TestMetadata(unittest.TestCase):
         meta.reader.config = MagicMock()
         meta.reader.config.subset = {"roi": [0, 1, 2, 3]}
         meta.get_product_metadata = metadata.EMITMetadataExtractor.get_product_metadata.__get__(meta)
-        meta.get_variable_metadata = metadata.EMITMetadataExtractor.get_variable_metadata.__get__(meta)
+        meta.get_variable_product_metadata = metadata.EMITMetadataExtractor.get_variable_product_metadata.__get__(
+            meta
+        )
         meta.get_variable_basic_metadata = metadata.EMITMetadataExtractor.get_variable_basic_metadata.__get__(meta)
         meta.get_basic_metadata = metadata.EMITMetadataExtractor.get_basic_metadata.__get__(meta)
         return meta
@@ -45,9 +47,9 @@ class TestMetadata(unittest.TestCase):
         self.assertIsInstance(md, dict)
         self.assertIn("history", md)
 
-    def test_get_variable_metadata_basic(self):
+    def test_get_variable_product_metadata_basic(self):
         meta = self._make_meta()
-        md = meta.get_variable_metadata("var")
+        md = meta.get_variable_product_metadata("var")
         self.assertIsInstance(md, dict)
         self.assertNotIn("long_name", md)
         self.assertNotIn("_FillValue", md)

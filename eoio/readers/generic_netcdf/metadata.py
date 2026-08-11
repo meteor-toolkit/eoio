@@ -10,9 +10,11 @@ Functions
    :toctree: generated/
 
    get_product_metadata
-   get_variable_metadata
+   get_variable_product_metadata
    get_basic_metadata
 """
+
+import warnings
 
 import xarray as xr
 from eoio.readers.metadata import BaseMetadataExtractor
@@ -48,6 +50,7 @@ optional_basic_var_metadata_keys = [
     "add_offset",
     "scale_factor",
     "flag_meanings",
+    "flag_values",
     "flag_masks",
 ]
 
@@ -67,7 +70,7 @@ class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
         md = self.ds.attrs.copy()
         return md
 
-    def get_variable_metadata(self, var: str) -> dict:
+    def get_variable_product_metadata(self, var: str) -> dict:
         """
         Extract variable metadata from the dataset.
 
@@ -93,7 +96,7 @@ class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
             if key in self.ds[var].attrs:
                 var_md[key] = self.ds[var].attrs[key]
             else:
-                Warning(f"Variable {var} missing expected metadata key: {key}")
+                warnings.warn(f"Variable {var} missing expected metadata key: {key}")
                 var_md[key] = ""
         for key in optional_basic_var_metadata_keys:
             if key in self.ds[var].attrs:

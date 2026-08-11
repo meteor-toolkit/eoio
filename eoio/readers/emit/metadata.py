@@ -10,9 +10,11 @@ Functions
    :toctree: generated/
 
    get_product_metadata
-   get_variable_metadata
+   get_variable_product_metadata
    get_basic_metadata
 """
+
+import warnings
 
 import xarray as xr
 import os
@@ -43,6 +45,7 @@ optional_basic_var_metadata_keys = [
     "add_offset",
     "scale_factor",
     "flag_meanings",
+    "flag_values",
     "flag_masks",
 ]
 
@@ -66,7 +69,7 @@ class EMITMetadataExtractor(BaseMetadataExtractor):
         md = self.ds.attrs.copy()
         return md
 
-    def get_variable_metadata(self, var: str) -> dict:
+    def get_variable_product_metadata(self, var: str) -> dict:
         """
         Extract variable metadata from the dataset.
 
@@ -106,7 +109,7 @@ class EMITMetadataExtractor(BaseMetadataExtractor):
             if key in self.ds[var].attrs:
                 var_md[key] = self.ds[var].attrs[key]
             else:
-                Warning(f"Variable {var} missing expected metadata key: {key}")
+                warnings.warn(f"Variable {var} missing expected metadata key: {key}")
                 var_md[key] = ""
         for key in optional_basic_var_metadata_keys:
             if key in self.ds[var].attrs:
@@ -133,7 +136,7 @@ class EMITMetadataExtractor(BaseMetadataExtractor):
             "product_bounds": self.subset["roi"],
             "product_date": self.reader.ds_src.time_coverage_end.split("T")[0],  # type: ignore[attr-defined]
             "description": self.reader.ds_src.summary,  # type: ignore[attr-defined]
-            "eoio:reader": "EMIT",
+            "eoio:reader": "emit",
             "eoio:subset": repr(self.subset),
             "footprint": normalize_footprint(
                 geometry_input=self.subset.get("roi") if self.subset else None,

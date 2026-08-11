@@ -133,15 +133,16 @@ class EMITL1BReader(NetCDFReader):
                 config=self.config,
             )
 
-        if (
-            self.config.read_params.get("metadata_level", None) == "original"
-            or self.config.read_params.get("metadata_level", None) is None
-        ):
+        mtd_level = self.config.read_params.get("metadata_level", None)
+        if mtd_level is True:
+            mtd_level = "all"
+
+        if mtd_level == "original" or mtd_level is None:
             return ds
         else:
             meta_ex = EMITMetadataExtractor(self, ds, self.layout)
             # ds=meta_ex.clear_metadata(ds) #TODO Is this needed for EMIT?
-            if self.config.read_params.get("metadata_level", None) in ("all", "basic"):
-                ds = meta_ex.attach_metadata(ds, level=self.config.read_params["metadata_level"])
+            if mtd_level in ("all", "basic"):
+                ds = meta_ex.attach_metadata(ds, level=mtd_level)
 
         return ds

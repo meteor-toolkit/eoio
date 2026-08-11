@@ -134,7 +134,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         self.assertEqual(md["processing_version"], "05.11")
 
         self.assertEqual(md["spatial_resolution"], [10, 20, 60])
-        self.assertEqual(md["geometry_id"], ["10m", "20m", "60m"])
+        self.assertEqual(md["geometry_ids"], ["10m", "20m", "60m"])
 
         self.assertEqual(md["geospatial_bounds"], "POLYGON((...))")
         self.assertEqual(md["product_date"], dt.date(2025, 11, 28))
@@ -251,7 +251,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         self.assertEqual(md["geometry_id"], "10m")
         self.assertEqual(md["band_central_wavelength"], 492.4)
         self.assertEqual(md["solar_irradiance"], 200.0)
-        self.assertEqual(md["solar_irradiance_unit"], "W/m²/µm")
+        self.assertEqual(md["solar_irradiance_units"], "W/m²/µm")
         self.assertEqual(md["radiometric_offset"], -1000)
         self.assertEqual(md["physical_gains"], 1.23)
         self.assertEqual(md["tile_shape"], (10980, 10980))
@@ -519,14 +519,14 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         for var in ["tcwv", "tco3", "msl", "u10", "v10", "r"]:
             md = ex.get_variable_product_metadata(var)
             self.assertEqual(md["spatial_resolution"], 5000)
-            self.assertEqual(md["spatial_resolution_unit"], "m")
+            self.assertEqual(md["spatial_resolution_units"], "m")
             self.assertEqual(md["geometry_id"], "5000m")
 
         # Test CAMS variables
         for var in ["aod550", "z", "bcaod550"]:
             md = ex.get_variable_product_metadata(var)
             self.assertEqual(md["spatial_resolution"], 5000)
-            self.assertEqual(md["spatial_resolution_unit"], "m")
+            self.assertEqual(md["spatial_resolution_units"], "m")
             self.assertEqual(md["geometry_id"], "5000m")
 
     @patch(

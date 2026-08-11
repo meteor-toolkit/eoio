@@ -90,7 +90,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             "processing_level": self.layout.processing_level,
             "processing_version": self.layout.proc_version,
             "spatial_resolution": res,
-            "geometry_id": geoms,
+            "geometry_ids": geoms,
             "geospatial_bounds": "TBC",
             "product_date": self.prod_hdf_reader.attrs.get("RANGEBEGINNINGDATE", "TBC")
             + "T"
@@ -189,10 +189,10 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": res,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": geom,
                     "band_central_wavelength": "TBC",
-                    "band_central_wavelength_unit": "nm",
+                    "band_central_wavelength_units": "nm",
                     "reflectance_offsets": var_attr_dict.get("reflectance_offsets", "N/A")
                     if self.layout.processing_level == "L1B"
                     else var_attr_dict.get("add_offset", "N/A"),
@@ -220,7 +220,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             variable_mtd.update(
                 {
                     "spatial_resolution": res,
-                    "spatial_resolution_unit": "m",
+                    "spatial_resolution_units": "m",
                     "geometry_id": geom,
                     "geoposition": "TBC",
                 }

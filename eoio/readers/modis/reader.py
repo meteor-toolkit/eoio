@@ -178,6 +178,8 @@ class MODISReader(BaseRasterReader):
                 chunks=rp.get("chunks", None),
             )
 
+        if mtd_level is True:
+            mtd_level = "all"
         if mtd_level in ("all", "basic"):
             ds = self.mtd.attach_metadata(ds, level=mtd_level)
 

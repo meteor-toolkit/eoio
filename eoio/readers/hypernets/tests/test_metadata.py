@@ -18,12 +18,12 @@ class TestMetadata(unittest.TestCase):
 
     @mock.patch("eoio.readers.base.os.path.exists", return_value=True)
     @mock.patch("eoio.readers.generic_netcdf.reader.xr.open_dataset")
-    def test_get_variable_metadata(self, mock_open_dataset, mock_exists):
+    def test_get_variable_product_metadata(self, mock_open_dataset, mock_exists):
         ds = xr.Dataset({"var": (["wavelength"], [1])})
         ds["var"].attrs["meta"] = "info"
         mock_open_dataset.return_value = ds
         reader = HYPERNETSReader("dummy_path")
-        md = HYPERNETSMetadataExtractor(reader, ds).get_variable_metadata("var")
+        md = HYPERNETSMetadataExtractor(reader, ds).get_variable_product_metadata("var")
         assert md["meta"] == "info"
 
     @mock.patch("eoio.readers.base.os.path.exists", return_value=True)
