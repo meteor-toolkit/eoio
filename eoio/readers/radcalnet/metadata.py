@@ -10,9 +10,11 @@ Functions
    :toctree: generated/
 
    get_product_metadata
-   get_variable_metadata
+   get_variable_product_metadata
    get_basic_metadata
 """
+
+import warnings
 
 import xarray as xr
 from eoio.readers.base import BaseReader
@@ -48,10 +50,19 @@ optional_basic_var_metadata_keys = [
     "err_corr_2_form",
     "err_corr_2_units",
     "err_corr_2_params",
+    "err_corr_3_dim",
+    "err_corr_3_form",
+    "err_corr_3_units",
+    "err_corr_3_params",
+    "err_corr_4_dim",
+    "err_corr_4_form",
+    "err_corr_4_units",
+    "err_corr_4_params",
     "pdf_shape",
     "add_offset",
     "scale_factor",
     "flag_meanings",
+    "flag_values",
     "flag_masks",
 ]
 
@@ -71,7 +82,7 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
         md = self.ds.attrs.copy()
         return md
 
-    def get_variable_metadata(self, var: str) -> dict:
+    def get_variable_product_metadata(self, var: str) -> dict:
         """
         Extract variable metadata from the dataset.
 
@@ -97,7 +108,7 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
             if key in self.ds[var].attrs:
                 var_md[key] = self.ds[var].attrs[key]
             else:
-                Warning(f"Variable {var} missing expected metadata key: {key}")
+                warnings.warn(f"Variable {var} missing expected metadata key: {key}")
                 var_md[key] = ""
         for key in optional_basic_var_metadata_keys:
             if key in self.ds[var].attrs:
@@ -117,13 +128,15 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
         name = self.ds.attrs["Site"][0:4]
         basic_md = {
             "collection_name": f"{name} {self.ds.attrs['collection']}",
+            "collection": self.ds.attrs["collection"],
             "product_name": f"{name}_RadCalNet_L1",
             "platform": "RadCalNet",
             "name": self.ds.attrs["Site"],
             "processing_level": "L1",
-            "spatial_resolution": "30 m disk",
+            "spatial_resolution": ROI_DEFINITIONS[name],
+            "spatial_resolution_units": "m",
             "geometry_ids": "insitu",
-            "product_bounds": f"{ROI_DEFINITIONS[name]} ({lon} {lat})",
+            "product_bounds": f"POINT ({lon} {lat})",
             "product_date": parser.parse(str(self.ds.time.values[0])).date(),
             "description": "TBD",
             "eoio:reader": "radcalnet",

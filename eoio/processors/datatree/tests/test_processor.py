@@ -282,6 +282,28 @@ class TestBuildDataTree:
         dt = build_datatree(ds, rename_vars=False)
         assert "reflectance_10m" in dt["10m"].dataset.data_vars
 
+    def test_variable_attrs_preserved_for_ungridded_data(self):
+        """Point/time-series data (e.g. RadCalNet, Hypernets) has no x_/y_ spatial dims, so
+        every variable lands at the root node untouched by grid grouping -- confirms
+        per-variable attrs (long_name/standard_name/units) survive that path too, not just
+        the gridded/renamed path covered by the other tests here."""
+        ds = xr.Dataset(
+            {
+                "air_pressure": xr.DataArray(
+                    [963.15],
+                    dims=("time",),
+                    attrs={"long_name": "Surface air pressure", "standard_name": "air_pressure", "units": "hPa"},
+                )
+            },
+            coords={"time": [0]},
+        )
+        dt = build_datatree(ds)
+        assert dt.root.dataset["air_pressure"].attrs == {
+            "long_name": "Surface air pressure",
+            "standard_name": "air_pressure",
+            "units": "hPa",
+        }
+
     def test_each_node_has_single_grid(self, s2_like_ds):
         dt = build_datatree(s2_like_ds)
         node_10m = dt["10m"].dataset

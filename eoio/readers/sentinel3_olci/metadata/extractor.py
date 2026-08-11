@@ -238,11 +238,11 @@ class S3OLCIMetadataExtractor(BaseMetadataExtractor):
         # Add spectral information if available
         if band_id in self._central_wavelengths:
             variable_mtd["band_central_wavelength"] = self._central_wavelengths[band_id]
-            variable_mtd["band_central_wavelength_unit"] = "nm"
+            variable_mtd["band_central_wavelength_units"] = "nm"
 
         if band_id in self._bandwidths:
             variable_mtd["band_bandwidth"] = self._bandwidths[band_id]
-            variable_mtd["band_bandwidth_unit"] = "nm"
+            variable_mtd["band_bandwidth_units"] = "nm"
 
         return variable_mtd
 

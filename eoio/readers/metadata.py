@@ -94,9 +94,11 @@ class BaseMetadataExtractor(ABC):
                         var_basic_md[var]["unc_comps"] = []
 
         # If a measurement list was provided, filter product-level spatial
-        # lists (e.g. spatial_resolution, geometry_id) to only include
-        # values for those measurement bands.
-        if meas_list and ("spatial_resolution" in basic_md or "geometry_id" in basic_md):
+        # lists (e.g. spatial_resolution, geometry_ids) to only include
+        # values for those measurement bands. "geometry_ids" (plural) is the
+        # dataset-level key -- get_basic_metadata()'s per-variable
+        # counterpart is "geometry_id" (singular), read from vmd below.
+        if meas_list and ("spatial_resolution" in basic_md or "geometry_ids" in basic_md):
             # Ensure it's a list of strings
             if isinstance(meas_list, str):
                 meas_list = [meas_list]
@@ -116,7 +118,7 @@ class BaseMetadataExtractor(ABC):
             if sr_vals:
                 basic_md["spatial_resolution"] = sr_vals
             if geom_vals:
-                basic_md["geometry_id"] = geom_vals
+                basic_md["geometry_ids"] = geom_vals
 
         return basic_md, md, var_basic_md, var_md
 
@@ -159,9 +161,12 @@ class BaseMetadataExtractor(ABC):
 
         out.attrs["eoio:version"] = __version__
         out.attrs["eoio:path"] = self.path
-        out.attrs["date_created"] = dt.datetime.now(dt.timezone.utc).isoformat()
-        out.attrs["license"] = "TBD"
-        out.attrs["references"] = "TBD"
+        # Defaults only -- a reader's own get_basic_metadata() (merged in above via
+        # out.attrs.update(basic_md)) takes precedence over these if it already supplied a
+        # value, rather than being silently overwritten.
+        out.attrs.setdefault("date_created", dt.datetime.now(dt.timezone.utc).isoformat())
+        out.attrs.setdefault("license", "TBD")
+        out.attrs.setdefault("references", "TBD")
 
         dt_now = dt.datetime.now(dt.timezone.utc).isoformat()
         if "history" in out.attrs:
@@ -176,13 +181,17 @@ class BaseMetadataExtractor(ABC):
 
     def clear_metadata(self, ds: xr.Dataset) -> xr.Dataset:
         """
-        Remove metadata (i.e. all attributes) from product and variables in place in dataset.
+        Remove metadata (i.e. all attributes) from product and data variables in place in
+        dataset. Coordinate attrs (e.g. a wavelength coordinate's units) are left untouched:
+        attach_metadata() only ever restores attrs for data variables (via
+        ``self.reader.list_include_vars()``), so wiping coordinate attrs here would discard
+        them permanently rather than clearing-then-reattaching them.
 
         :param ds: Dataset from which to remove metadata (attrs).
         :returns: Dataset with attrs cleared.
         """
         ds.attrs = {}
-        for var in ds.variables:
+        for var in ds.data_vars:
             ds[var].attrs = {}
 
         return ds

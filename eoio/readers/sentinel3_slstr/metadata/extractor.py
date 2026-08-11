@@ -157,11 +157,11 @@ class S3SLSTRMetadataExtractor(BaseMetadataExtractor):
 
         if band_token in self._central_wavelengths:
             m["band_central_wavelength"] = self._central_wavelengths[band_token]
-            m["band_central_wavelength_unit"] = "nm"
+            m["band_central_wavelength_units"] = "nm"
 
         if band_token in self._bandwidths:
             m["band_bandwidth"] = self._bandwidths[band_token]
-            m["band_bandwidth_unit"] = "nm"
+            m["band_bandwidth_units"] = "nm"
 
         # spatial resolution may be inferred from layout when available
         try:

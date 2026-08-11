@@ -93,13 +93,17 @@ class ERA5Reader(NetCDFReader):
         )
 
         # attach metadata
-        if self.config.read_params.get("metadata_level", None) == "original":
+        mtd_level = self.config.read_params.get("metadata_level", None)
+        if mtd_level is True:
+            mtd_level = "all"
+
+        if mtd_level == "original":
             return ds
         else:
             meta_ex = GenericNetCDFMetadataExtractor(self, ds)
             ds = meta_ex.clear_metadata(ds)
-            if self.config.read_params.get("metadata_level", None) in ("all", "basic"):
-                ds = meta_ex.attach_metadata(ds, level=self.config.read_params["metadata_level"])
+            if mtd_level in ("all", "basic"):
+                ds = meta_ex.attach_metadata(ds, level=mtd_level)
             return ds
 
 

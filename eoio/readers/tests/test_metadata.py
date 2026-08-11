@@ -38,7 +38,7 @@ class _DummyExtractor(BaseMetadataExtractor):
             "collection_name": "TEST",
             "eoio:reader": "dummy",
             "spatial_resolution": all_resolutions,
-            "geometry_id": all_geom_ids,
+            "geometry_ids": all_geom_ids,
         }
 
     def get_product_metadata(self) -> dict:
@@ -81,7 +81,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
         self.assertEqual(a["collection_name"], "TEST")
         self.assertEqual(a["eoio:reader"], "dummy")
         self.assertIn("spatial_resolution", a)
-        self.assertIn("geometry_id", a)
+        self.assertIn("geometry_ids", a)
         self.assertIs(a, b)
         self.assertEqual(self.extractor.calls["basic"], 1)
 
@@ -126,7 +126,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
         self.assertEqual(basic_md["collection_name"], "TEST")
         # Without meas_list, spatial lists should include all bands
         self.assertIn("spatial_resolution", basic_md)
-        self.assertIn("geometry_id", basic_md)
+        self.assertIn("geometry_ids", basic_md)
         self.assertEqual(md, {})
         self.assertEqual(var_basic_md, {})
         self.assertEqual(var_md, {})
@@ -136,7 +136,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         self.assertEqual(basic_md["collection_name"], "TEST")
         self.assertIn("spatial_resolution", basic_md)
-        self.assertIn("geometry_id", basic_md)
+        self.assertIn("geometry_ids", basic_md)
         self.assertEqual(md, {"orbit": 137})
 
         self.assertEqual(set(var_md.keys()), {"B02", "B03"})
@@ -157,20 +157,20 @@ class TestBaseMetadataExtractor(unittest.TestCase):
         self.assertEqual(var_basic_md["B02"]["unc_comps"], [])
 
     def test_extract_metadata_filters_spatial_lists_by_meas_list(self):
-        """Verify spatial_resolution and geometry_id are filtered when meas_list is provided."""
+        """Verify spatial_resolution and geometry_ids are filtered when meas_list is provided."""
         # Request only B02 and B05 (10m and 20m)
         basic_md, md, var_basic_md, var_md = self.extractor.extract_metadata(level=None, meas_list=["B02", "B05"])
 
         # Spatial lists should only contain values for B02 and B05
         self.assertEqual(basic_md["spatial_resolution"], [10, 20])
-        self.assertEqual(basic_md["geometry_id"], ["10m", "20m"])
+        self.assertEqual(basic_md["geometry_ids"], ["10m", "20m"])
 
     def test_extract_metadata_filters_spatial_lists_single_band(self):
         """Verify spatial filtering works with a single band."""
         basic_md, md, var_basic_md, var_md = self.extractor.extract_metadata(level=None, meas_list=["B11"])
 
         self.assertEqual(basic_md["spatial_resolution"], [20])
-        self.assertEqual(basic_md["geometry_id"], ["20m"])
+        self.assertEqual(basic_md["geometry_ids"], ["20m"])
 
     def test_extract_metadata_handles_empty_meas_list(self):
         """Verify empty meas_list results in empty spatial lists."""
@@ -178,7 +178,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         # Should preserve the original full lists when meas_list is empty
         self.assertIn("spatial_resolution", basic_md)
-        self.assertIn("geometry_id", basic_md)
+        self.assertIn("geometry_ids", basic_md)
 
     def test_extract_metadata_ignores_unknown_bands_in_meas_list(self):
         """Verify unknown band names are silently skipped in meas_list."""
@@ -188,7 +188,18 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         # Only B02 and B04 should be included (UNKNOWN has no metadata)
         self.assertEqual(basic_md["spatial_resolution"], [10, 10])
-        self.assertEqual(basic_md["geometry_id"], ["10m", "10m"])
+        self.assertEqual(basic_md["geometry_ids"], ["10m", "10m"])
+
+    def test_extract_metadata_filtering_does_not_inject_spurious_singular_key(self):
+        """Regression test: the filtering trigger/output key used to be the singular
+        "geometry_id" even though get_basic_metadata()'s own documented dataset-level key is
+        plural "geometry_ids" -- so for any reader using the (correct, majority) plural
+        convention, filtering silently left "geometry_ids" unfiltered and injected a spurious
+        singular "geometry_id" key that was never part of the reader's own schema."""
+        basic_md, _, _, _ = self.extractor.extract_metadata(level=None, meas_list=["B02", "B05"])
+
+        self.assertNotIn("geometry_id", basic_md)
+        self.assertEqual(basic_md["geometry_ids"], ["10m", "20m"])
 
     # ------------------------------------------------------------------
     # attach_metadata
@@ -212,6 +223,40 @@ class TestBaseMetadataExtractor(unittest.TestCase):
         self.assertEqual(out.attrs["eoio:version"], "9.9.9")
         self.assertEqual(out.attrs["eoio:path"], "/tmp/TEST.SAFE")
         self.assertIn("history", out.attrs)
+
+        # license/references/date_created default to "TBD"/now() when the reader doesn't
+        # supply its own values (see _DummyExtractor.get_basic_metadata())
+        self.assertEqual(out.attrs["license"], "TBD")
+        self.assertEqual(out.attrs["references"], "TBD")
+        self.assertIn("date_created", out.attrs)
+
+    @patch("eoio.readers.metadata.__version__", "9.9.9")
+    def test_attach_metadata_prefers_reader_supplied_license_references_date_created(self):
+        """Regression test: license/references/date_created used to be unconditionally
+        overwritten by attach_metadata() even when the reader's own get_basic_metadata()
+        already supplied a real value -- making any reader-level value for these three keys
+        dead code. They should now only fall back to the base class's default when the
+        reader didn't provide one."""
+
+        class _ExtractorWithLicense(_DummyExtractor):
+            def get_basic_metadata(self) -> dict:
+                md = super().get_basic_metadata()
+                md.update(
+                    {
+                        "license": "CC-BY-4.0",
+                        "references": "https://example.org/doi/123",
+                        "date_created": "2020-01-01T00:00:00+00:00",
+                    }
+                )
+                return md
+
+        extractor = _ExtractorWithLicense(self.reader)
+        ds = xr.Dataset({"B02": xr.DataArray([1, 2, 3])})
+        out = extractor.attach_metadata(ds, level=None)
+
+        self.assertEqual(out.attrs["license"], "CC-BY-4.0")
+        self.assertEqual(out.attrs["references"], "https://example.org/doi/123")
+        self.assertEqual(out.attrs["date_created"], "2020-01-01T00:00:00+00:00")
 
     @patch("eoio.readers.metadata.__version__", "9.9.9")
     def test_attach_metadata_all_level_adds_product_metadata_and_variable_metadata(
@@ -249,7 +294,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
     @patch("eoio.readers.metadata.__version__", "9.9.9")
     def test_attach_metadata_filters_spatial_lists_to_bands_in_dataset(self):
-        """Verify attach_metadata filters spatial_resolution/geometry_id to bands present in ds."""
+        """Verify attach_metadata filters spatial_resolution/geometry_ids to bands present in ds."""
         # Set up reader to report B02, B03, B04 as requested/resolved
         self.reader.resolved_config = MagicMock()
         self.reader.resolved_config.vars_sel = {"meas": ["B02", "B03", "B04"]}
@@ -266,7 +311,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         # Spatial lists should only include B02 and B04 (both 10m)
         self.assertEqual(out.attrs["spatial_resolution"], [10, 10])
-        self.assertEqual(out.attrs["geometry_id"], ["10m", "10m"])
+        self.assertEqual(out.attrs["geometry_ids"], ["10m", "10m"])
 
     @patch("eoio.readers.metadata.__version__", "9.9.9")
     def test_attach_metadata_all_level_filters_spatial_with_partial_bands(self):
@@ -286,7 +331,7 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         # Spatial lists should only include B02 and B05
         self.assertEqual(out.attrs["spatial_resolution"], [10, 20])
-        self.assertEqual(out.attrs["geometry_id"], ["10m", "20m"])
+        self.assertEqual(out.attrs["geometry_ids"], ["10m", "20m"])
 
     # ------------------------------------------------------------------
     # clear_metadata
@@ -304,6 +349,21 @@ class TestBaseMetadataExtractor(unittest.TestCase):
 
         self.assertEqual(out.attrs, {})
         self.assertEqual(out["B02"].attrs, {})
+
+    def test_clear_metadata_leaves_coordinate_attrs_untouched(self):
+        """Coordinate attrs (e.g. a wavelength coordinate's units) must survive
+        clear_metadata(): attach_metadata() only ever restores attrs for data variables
+        (via self.reader.list_include_vars(), which coordinates are never part of), so
+        wiping them here would discard them permanently rather than clearing-then-
+        reattaching them."""
+        ds = xr.Dataset(
+            {"B02": xr.DataArray([1], dims=("wavelength",), attrs={"a": "b"})},
+            coords={"wavelength": xr.DataArray([400], dims=("wavelength",), attrs={"units": "nm"})},
+        )
+        out = self.extractor.clear_metadata(ds)
+
+        self.assertEqual(out["B02"].attrs, {})
+        self.assertEqual(out["wavelength"].attrs, {"units": "nm"})
 
 
 if __name__ == "__main__":

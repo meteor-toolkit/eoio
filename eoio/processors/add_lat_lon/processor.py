@@ -153,8 +153,16 @@ class AddLatLon(BaseProcessor):
             lons, lats = transformer.transform(x, y)
 
             lat_lon_dict = {
-                f"latitude_{geom}": ([f"y_{geom}", f"x_{geom}"], lats),
-                f"longitude_{geom}": ([f"y_{geom}", f"x_{geom}"], lons),
+                f"latitude_{geom}": (
+                    [f"y_{geom}", f"x_{geom}"],
+                    lats,
+                    {"standard_name": "latitude", "long_name": "latitude", "units": "degrees_north"},
+                ),
+                f"longitude_{geom}": (
+                    [f"y_{geom}", f"x_{geom}"],
+                    lons,
+                    {"standard_name": "longitude", "long_name": "longitude", "units": "degrees_east"},
+                ),
             }
 
             ds = ds.assign_coords(coords=lat_lon_dict)
