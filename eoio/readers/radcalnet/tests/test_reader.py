@@ -53,6 +53,49 @@ class DummyReader(RadCalNetReader):
         return {}, {}, {}
 
 
+class testSiteDaylightWindowUTC(unittest.TestCase):
+    def test_gona_matches_old_hardcoded_default(self):
+        # GONA (15.119215 degE) is the site the old fixed 08:00-14:00 UTC
+        # default was tuned for -- the dynamic window should reproduce it.
+        # This also regression-tests a rounding bug found during development:
+        # independently rounding hour/minute parts gave "07:60" for this exact
+        # longitude (int(7.9920...)=7, round(0.9920...*60)=60, no carry).
+        window = RadCalNetReader._site_daylight_window_utc(15.119215)
+        assert window == {"min": "08:00", "max": "14:00"}
+
+    def test_rvus_gets_a_daytime_not_nighttime_window(self):
+        # RVUS (-115.69 degW) is many hours behind GONA in UTC -- the old
+        # hardcoded 08:00-14:00 UTC window fell in the middle of RVUS's
+        # local night, producing an empty dataset after subsetting.
+        window = RadCalNetReader._site_daylight_window_utc(-115.69)
+        assert window == {"min": "16:43", "max": "22:43"}
+
+
+class testTimeOfDayUTCExplicitlySet(unittest.TestCase):
+    def test_not_set_when_subset_omitted(self):
+        reader = DummyReader(path=".", vars_sel=None, subset=None, read_params=None)
+        assert reader._time_of_day_utc_explicitly_set is False
+
+    def test_not_set_when_subset_given_without_the_key(self):
+        reader = DummyReader(
+            path=".", vars_sel=None, subset={"wavelength": {"min": 400, "max": 2500}}, read_params=None
+        )
+        assert reader._time_of_day_utc_explicitly_set is False
+
+    def test_set_when_key_present_even_if_value_is_none(self):
+        # An explicit {"time_of_day_utc": None} means "no time-of-day
+        # subsetting at all" and must survive -- it must not be mistaken
+        # for "caller didn't specify, fill in the per-site default".
+        reader = DummyReader(path=".", vars_sel=None, subset={"time_of_day_utc": None}, read_params=None)
+        assert reader._time_of_day_utc_explicitly_set is True
+
+    def test_set_when_key_present_with_a_value(self):
+        reader = DummyReader(
+            path=".", vars_sel=None, subset={"time_of_day_utc": {"min": "09:00", "max": "12:00"}}, read_params=None
+        )
+        assert reader._time_of_day_utc_explicitly_set is True
+
+
 class testRadCalNetReader(unittest.TestCase):
     utc = [
         "08:00",
@@ -366,6 +409,19 @@ class testRadCalNetReader(unittest.TestCase):
             ]
         )
         assert vals.shape == (10, 181)
+
+    def test_explicit_time_of_day_utc_overrides_site_default(self):
+        # skip if no data
+        if not os.path.exists(test_data_path):
+            self.skipTest(f"Test .output data not found at {test_data_path}")
+
+        # GONA's dynamic per-site window (08:00-14:00 UTC) covers all 13
+        # samples in self.utc; a narrower explicit override must be honoured
+        # instead of being replaced by the per-site default.
+        output = RadCalNetReader(test_data_path, subset={"time_of_day_utc": {"min": "08:00", "max": "10:00"}})
+        ds = output.open_dataset()
+
+        assert ds.time.values.shape[0] == 5
 
 
 if __name__ == "__main__":
