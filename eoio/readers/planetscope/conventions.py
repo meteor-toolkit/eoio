@@ -24,7 +24,8 @@ def apply_conventions(
 
     :returns: xarray.Dataset with conventions applied.
     """
-    eoio_subset = roi_subset.clip_box if roi_subset else None
+    # "" (not None) -- an attr value of None can't be written to netCDF.
+    eoio_subset = roi_subset.clip_box if roi_subset else ""
 
     eoio_attrs = {"eoio:reader": "planetscope", "eoio:subset": eoio_subset}
 

@@ -1,6 +1,7 @@
 """eoio.readers.sentinel3_olci.metadata.tests.test_extractor - tests for S3OLCIMetadataExtractor."""
 
 from __future__ import annotations
+import json
 import unittest
 from unittest.mock import MagicMock
 from pathlib import Path
@@ -188,6 +189,27 @@ class TestS3OLCIMetadataExtractor(unittest.TestCase):
 
         self.assertIn("eoio:reader", metadata)
         self.assertEqual(metadata["eoio:reader"], "sentinel3_olci")
+
+    def test_eoio_subset_omitted_when_no_subset(self):
+        reader = self._make_reader_with_layout(str(self.xml_file))
+        extractor = S3OLCIMetadataExtractor(reader)
+
+        metadata = extractor.get_basic_metadata()
+
+        self.assertNotIn("eoio:subset", metadata)
+
+    def test_eoio_subset_is_valid_json_when_subset_present(self):
+        """Regression test: eoio:subset used to be the raw subset dict, which isn't
+        netCDF-attribute-safe (a raw dict can't be written to netCDF) and, unlike
+        every other reader's eoio:subset, wasn't serialised at all."""
+        reader = self._make_reader_with_layout(str(self.xml_file))
+        reader.resolved_config.subset = {"roi_crs_epsg": "EPSG:4326"}
+        extractor = S3OLCIMetadataExtractor(reader)
+
+        metadata = extractor.get_basic_metadata()
+
+        parsed = json.loads(metadata["eoio:subset"])
+        self.assertEqual(parsed["roi_crs_epsg"], "EPSG:4326")
 
     # ---- get_product_metadata tests -----------------------------------------
 

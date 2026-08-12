@@ -22,7 +22,8 @@ class TestApplyConventions(unittest.TestCase):
 
         self.assertEqual(out.attrs["eoio:reader"], "sentinel3_olci")
         self.assertIn("eoio:subset", out.attrs)
-        self.assertIsNone(out.attrs["eoio:subset"])
+        # "" (not None) -- an attr value of None can't be written to netCDF.
+        self.assertEqual(out.attrs["eoio:subset"], "")
 
     def test_sets_attrs_when_subset_present(self):
         ds = xr.Dataset()
