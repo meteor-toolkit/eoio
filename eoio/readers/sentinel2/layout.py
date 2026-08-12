@@ -140,6 +140,29 @@ class S2Layout:
                 uniq.append(f)
         return uniq
 
+    def msk_classi_path(self, granule: Optional[Path] = None) -> Optional[str]:
+        """
+        Return the path to the L1C classification mask (``MSK_CLASSI_B00.jp2``), if present.
+
+        This is the per-granule cloud/snow classification raster shipped with
+        L1C products from processing baseline 04.00 onwards: a 60 m, 3-band
+        JP2 whose bands are opaque clouds, cirrus and snow/ice (see
+        :py:data:`~eoio.readers.sentinel2.masks.MSK_CLASSI_BANDS`). Earlier
+        baselines instead provide ``QA60.jp2`` / ``MSK_CLOUDS_B00.gml``, which
+        are not handled here -- callers get ``None`` and should treat masks as
+        unavailable for those products.
+
+        :param granule:
+            Optional granule directory. If omitted, the primary granule is used.
+        :return:
+            Path to the classification mask JP2, or ``None`` if the product
+            does not carry one.
+        """
+        for f in self.qi_jp2_files(granule=granule):
+            if "MSK_CLASSI" in f.name.upper():
+                return str(f)
+        return None
+
     def available_img_tokens(self) -> List[str]:
         """
         Return unique IMG_DATA layer tokens inferred from filenames.

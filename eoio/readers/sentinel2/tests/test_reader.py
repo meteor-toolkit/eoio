@@ -116,6 +116,60 @@ class TestS2MSIReader(unittest.TestCase):
         )
 
     @patch("eoio.readers.sentinel2.reader.apply_conventions")
+    @patch("eoio.readers.sentinel2.reader.add_masks")
+    @patch("eoio.readers.sentinel2.reader.read_bands_into_dataset")
+    def test_open_dataset_reads_masks_when_requested(
+        self,
+        read_bands_into_dataset,
+        add_masks,
+        apply_conventions,
+    ):
+        """Masks must be read against the same resolved ROI subset as the bands,
+        so the mask is clipped to the region of interest rather than the whole tile."""
+        reader = self._make_reader_minimal()
+        reader.resolved_config = SimpleNamespace(
+            vars_sel={"meas": ["B02"], "mask": ["opaque_clouds", "cirrus"]},
+            subset=Mock(name="roi_subset"),
+            read_params={"metadata_level": None},
+        )
+
+        ds1 = xr.Dataset({"foo": ("x", [1, 2, 3])})
+        read_bands_into_dataset.return_value = ds1
+        add_masks.return_value = ds1
+        apply_conventions.return_value = ds1
+
+        reader.open_dataset()
+
+        add_masks.assert_called_once()
+        kwargs = add_masks.call_args.kwargs
+        self.assertEqual(kwargs["masks"], ["opaque_clouds", "cirrus"])
+        self.assertIs(kwargs["layout"], reader.layout)
+        self.assertIs(kwargs["subset"], reader.resolved_config.subset)
+
+    @patch("eoio.readers.sentinel2.reader.apply_conventions")
+    @patch("eoio.readers.sentinel2.reader.add_masks")
+    @patch("eoio.readers.sentinel2.reader.read_bands_into_dataset")
+    def test_open_dataset_does_not_read_masks_when_not_requested(
+        self,
+        read_bands_into_dataset,
+        add_masks,
+        apply_conventions,
+    ):
+        reader = self._make_reader_minimal()
+        reader.resolved_config = SimpleNamespace(
+            vars_sel={"meas": ["B02"], "mask": []},
+            subset=None,
+            read_params={"metadata_level": None},
+        )
+        ds1 = xr.Dataset({"foo": ("x", [1, 2, 3])})
+        read_bands_into_dataset.return_value = ds1
+        apply_conventions.return_value = ds1
+
+        reader.open_dataset()
+
+        add_masks.assert_not_called()
+
+    @patch("eoio.readers.sentinel2.reader.apply_conventions")
     @patch("eoio.readers.sentinel2.reader.read_bands_into_dataset")
     def test_open_dataset_does_not_read_bands_when_meas_vars_none(
         self,
