@@ -63,6 +63,28 @@ class TestMODISMetadataExtractor(unittest.TestCase):
 
             self.assertEqual(metadata["processing_level"], "L1B")
 
+    def test_get_basic_metadata_includes_eoio_reader(self):
+        """Every other reader (hypernets, radcalnet, emit, generic_netcdf, landsat,
+        planetscope, sentinel2/3_olci/slstr, airbus_pleiades) sets "eoio:reader" in
+        get_basic_metadata; MODIS was missing it entirely."""
+        with patch("eoio.readers.modis.metadata.extractor.modis_prod_mtd_reader_factory") as mock_factory:
+            mock_reader = MagicMock()
+            mock_reader.attrs = {
+                "LONGNAME": "Test",
+                "SHORTNAME": "TST",
+                "PRODUCT_NAME": "MOD02",
+                "ASSOCIATEDPLATFORMSHORTNAME.1": "Terra",
+                "ASSOCIATEDINSTRUMENTSHORTNAME.1": "MODIS",
+                "RANGEBEGINNINGDATE": "2020-01-01",
+                "RANGEBEGINNINGTIME": "00:00:00",
+            }
+            mock_factory.return_value = mock_reader
+
+            extractor = MODISMetadataExtractor(self.reader)
+            metadata = extractor.get_basic_metadata()
+
+            self.assertEqual(metadata["eoio:reader"], "modis")
+
     def test_meas_var_band_ids_set_correctly(self):
         """Test that measurement variable band IDs are set during initialization."""
         with patch("eoio.readers.modis.metadata.extractor.modis_prod_mtd_reader_factory"):
