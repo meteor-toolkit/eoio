@@ -8,6 +8,7 @@ from eoio.readers.sentinel2.layout import S2Layout
 from eoio.readers.sentinel2.data_io import read_bands_into_dataset
 from eoio.readers.sentinel2.aux_vars.aux_data import get_available_aux, add_aux
 from eoio.readers.sentinel2.conventions import apply_conventions
+from eoio.readers.sentinel2.masks import MASK_OPTIONS, add_masks
 from eoio.readers.base import BaseRasterReader
 from eoio.readers.subset.roi_subset import ROISubsetResolver, ResolvedROISubset
 from eoio.readers.sentinel2.metadata.extractor import S2MSIMetadataExtractor
@@ -52,7 +53,12 @@ class S2MSIReader(BaseRasterReader):
             "rgb": ["B02", "B03", "B04"],
         }
 
-        self.mask_def = {"all": []}  # MASK_OPTIONS,
+        self.mask_def = {
+            "all": MASK_OPTIONS,
+            # Convenience grouping: the two layers that represent cloud, as opposed
+            # to snow/ice, which is a surface condition rather than an obstruction.
+            "cloud": ["opaque_clouds", "cirrus"],
+        }
 
         self.aux_def = {
             "all": get_available_aux(self.layout),
@@ -142,9 +148,19 @@ class S2MSIReader(BaseRasterReader):
                 preferred_resolution=preferred_resolution,
             )
 
-        # Add mask data if requested
+        # Add auxiliary data if requested
         if self.config.vars_sel["aux"]:
             ds = add_aux(ds=ds, layout=self.layout, config=self.resolved_config, mtd=self.mtd)
+
+        # Add mask data if requested
+        if self.resolved_config.vars_sel.get("mask"):
+            ds = add_masks(
+                ds=ds,
+                masks=self.resolved_config.vars_sel["mask"],
+                layout=self.layout,
+                subset=roi_subset,
+                config=self.resolved_config,
+            )
 
         if mtd_level is True:
             mtd_level = "all"

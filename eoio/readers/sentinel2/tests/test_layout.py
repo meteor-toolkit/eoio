@@ -313,5 +313,41 @@ class TestS2LayoutData(unittest.TestCase):
         self.assertIn("B02", bands)  # Assuming B02 is present in the test data
 
 
+class TestMskClassiPath(unittest.TestCase):
+    """Tests for S2Layout.msk_classi_path (L1C cloud/snow classification mask)."""
+
+    def _make_safe_with_qi(self, root: Path, qi_files: Optional[List[str]] = None) -> Path:
+        safe = root / "S2A_TEST.SAFE"
+        granule = safe / "GRANULE" / "G1"
+        granule.mkdir(parents=True, exist_ok=False)
+        (safe / "MTD_MSIL1C.xml").write_text("<xml/>", encoding="utf-8")
+        (granule / "MTD_TL.xml").write_text("<xml/>", encoding="utf-8")
+        if qi_files is not None:
+            qi = granule / "QI_DATA"
+            qi.mkdir(parents=True, exist_ok=False)
+            for name in qi_files:
+                (qi / name).write_text("jp2", encoding="utf-8")
+        return safe
+
+    def test_finds_msk_classi(self):
+        with TemporaryDirectory() as td:
+            safe = self._make_safe_with_qi(Path(td), ["MSK_CLASSI_B00.jp2", "MSK_DETFOO_B02.jp2"])
+            path = S2Layout(str(safe)).msk_classi_path()
+            self.assertIsNotNone(path)
+            self.assertTrue(path.endswith("MSK_CLASSI_B00.jp2"))
+
+    def test_returns_none_when_only_legacy_masks_present(self):
+        """Pre-04.00 baselines ship QA60.jp2 instead of MSK_CLASSI; those are not
+        supported, and must yield None rather than a wrong file."""
+        with TemporaryDirectory() as td:
+            safe = self._make_safe_with_qi(Path(td), ["QA60.jp2", "MSK_DETFOO_B02.jp2"])
+            self.assertIsNone(S2Layout(str(safe)).msk_classi_path())
+
+    def test_returns_none_when_no_qi_data_dir(self):
+        with TemporaryDirectory() as td:
+            safe = self._make_safe_with_qi(Path(td), qi_files=None)
+            self.assertIsNone(S2Layout(str(safe)).msk_classi_path())
+
+
 if __name__ == "__main__":
     unittest.main()
