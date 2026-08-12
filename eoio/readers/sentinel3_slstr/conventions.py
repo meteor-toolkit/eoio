@@ -12,7 +12,8 @@ def apply_conventions(ds, layout=None, roi_subset=None, config=None):
 
     roi_subset = config.subset
     if roi_subset is None:
-        roi_subset_attr = None
+        # "" (not None) -- an attr value of None can't be written to netCDF.
+        roi_subset_attr = ""
 
     else:
         roi_subset_attr = roi_subset.clip_box

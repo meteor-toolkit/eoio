@@ -10,7 +10,8 @@ def apply_conventions(ds: xr.Dataset, *, layout: S2Layout, config: Any) -> xr.Da
 
     roi_subset = config.subset
     if roi_subset is None:
-        roi_subset_attr = None
+        # "" (not None) -- an attr value of None can't be written to netCDF.
+        roi_subset_attr = ""
 
     else:
         roi_subset_attr = roi_subset.clip_box

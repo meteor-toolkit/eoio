@@ -14,6 +14,7 @@ Functions
    get_basic_metadata
 """
 
+import json
 import warnings
 
 import xarray as xr
@@ -121,7 +122,11 @@ class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
             "product_date": self.ds.attrs.get("product_date", ""),
             "description": self.ds.attrs.get("description", ""),
             "eoio:reader": "generic_netcdf",
-            "eoio:subset": repr(self.subset),
+            # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset
+            # convention used elsewhere -- repr() produces Python-only syntax (e.g. single
+            # quotes) that isn't valid JSON. default=str covers subset values that aren't
+            # natively JSON-serialisable (e.g. a shapely ROI geometry).
+            "eoio:subset": json.dumps(self.subset, default=str) if self.subset else "",
             "footprint": normalize_footprint(
                 geometry_input=self.ds.attrs.get("product_bounds"),
                 crs_input=self.ds.attrs.get("footprint_crs", None),

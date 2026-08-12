@@ -1,5 +1,7 @@
 """Tests for eoio.processors.stack.processor"""
 
+import json
+
 import numpy as np
 import pytest
 import xarray as xr
@@ -127,6 +129,16 @@ class TestGetNestedAttr:
 
     def test_intermediate_value_not_dict_returns_none(self):
         da = self._da({"product_metadata": "not_a_dict"})
+        assert _get_nested_attr(da, "product_metadata.central_wavelength") is None
+
+    def test_json_stringified_intermediate_dict_is_parsed(self):
+        # A reader may have already JSON-stringified product_metadata to make it
+        # netCDF-safe before this processor runs -- the lookup should still work.
+        da = self._da({"product_metadata": json.dumps({"central_wavelength": 560.0})})
+        assert _get_nested_attr(da, "product_metadata.central_wavelength") == 560.0
+
+    def test_invalid_json_string_returns_none(self):
+        da = self._da({"product_metadata": "not valid json {"})
         assert _get_nested_attr(da, "product_metadata.central_wavelength") is None
 
 
@@ -426,6 +438,44 @@ class TestCoordFromAttr:
         assert isinstance(wl_attr, list)
         assert wl_attr == [490.0, 560.0, 665.0, 842.0]
 
+    def test_original_names_kept_as_auxiliary_coord(self, wavelength_ds):
+        result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(wavelength_ds)
+        name_coord = list(result["toa_reflectance_10m"].coords["stack_dim_10m_name"].values)
+        assert name_coord == ["B02", "B03", "B04", "B08"]
+
+    def test_auxiliary_name_coord_aligned_with_dim_coord(self, wavelength_ds):
+        result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(wavelength_ds)
+        cube = result["toa_reflectance_10m"]
+        idx = list(cube.coords["stack_dim_10m"].values).index(665.0)
+        assert cube.coords["stack_dim_10m_name"].values[idx] == "B04"
+
+    def test_auxiliary_name_coord_has_long_name(self, wavelength_ds):
+        result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(wavelength_ds)
+        assert result["toa_reflectance_10m"].coords["stack_dim_10m_name"].attrs["long_name"]
+
+    def test_no_auxiliary_name_coord_when_fallback_to_names(self, wavelength_ds):
+        wavelength_ds["B08"].attrs.pop("central_wavelength")
+        result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(wavelength_ds)
+        assert "stack_dim_10m_name" not in result["toa_reflectance_10m"].coords
+
+    def test_no_auxiliary_name_coord_when_dim_coord_attr_unset(self, wavelength_ds):
+        result = StackCubes().run(wavelength_ds)
+        assert "stack_dim_10m_name" not in result["toa_reflectance_10m"].coords
+
+    def test_dim_coord_attr_tolerates_json_stringified_metadata(self):
+        # Regression test: a reader may leave product_metadata as a JSON string
+        # (netCDF-safe) rather than a raw dict by the time this processor runs.
+        ds = xr.Dataset()
+        for name, wl in [("B02", 490.0), ("B03", 560.0)]:
+            ds[name] = _da(
+                ("y_10m", "x_10m"),
+                measurand="toa_reflectance",
+                extra_attrs={"product_metadata": json.dumps({"central_wavelength": wl})},
+            )
+        result = StackCubes(params={"dim_coord_attr": "product_metadata.central_wavelength"}).run(ds)
+        coord = list(result["toa_reflectance_10m"].coords["stack_dim_10m"].values)
+        assert coord == [490.0, 560.0]
+
 
 # ---------------------------------------------------------------------------
 # Unit tests — _collect_per_band_ancillaries
@@ -485,6 +535,13 @@ class TestAncillaryStacking:
         result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(ancillary_ds)
         coord = list(result["viewing_zenith_angle_10m"].coords["stack_dim_10m"].values)
         assert coord == [490.0, 560.0, 665.0]
+
+    def test_ancillary_cube_also_gets_auxiliary_name_coord(self, ancillary_ds):
+        # stack_dim_10m_name is a dataset-level coordinate on the shared dim, so the
+        # ancillary cube picks it up too even though only the parent cube set it.
+        result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(ancillary_ds)
+        name_coord = list(result["viewing_zenith_angle_10m"].coords["stack_dim_10m_name"].values)
+        assert name_coord == ["B02", "B03", "B04"]
 
     def test_shared_ancillary_not_stacked_into_band_cube(self, ancillary_ds):
         result = StackCubes(params={"dim_coord_attr": "central_wavelength"}).run(ancillary_ds)

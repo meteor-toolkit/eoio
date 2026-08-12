@@ -14,6 +14,7 @@ Functions
    get_basic_metadata
 """
 
+import json
 import warnings
 
 import xarray as xr
@@ -137,7 +138,11 @@ class EMITMetadataExtractor(BaseMetadataExtractor):
             "product_date": self.reader.ds_src.time_coverage_end.split("T")[0],  # type: ignore[attr-defined]
             "description": self.reader.ds_src.summary,  # type: ignore[attr-defined]
             "eoio:reader": "emit",
-            "eoio:subset": repr(self.subset),
+            # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset
+            # convention used elsewhere -- repr() produces Python-only syntax (e.g. single
+            # quotes) that isn't valid JSON. default=str covers subset values that aren't
+            # natively JSON-serialisable (e.g. a shapely ROI geometry).
+            "eoio:subset": json.dumps(self.subset, default=str) if self.subset else "",
             "footprint": normalize_footprint(
                 geometry_input=self.subset.get("roi") if self.subset else None,
                 crs_input=None,  # EMIT CRS not readily available in subset/metadata

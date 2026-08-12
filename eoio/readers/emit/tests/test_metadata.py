@@ -1,5 +1,6 @@
 """Tests for eoio.readers.emit.metadata"""
 
+import json
 import unittest
 import xarray as xr
 from eoio.readers.emit import metadata
@@ -71,6 +72,15 @@ class TestMetadata(unittest.TestCase):
         self.assertIn("platform", md)
         self.assertIn("product_bounds", md)
         self.assertIn("history", md)
+
+    def test_eoio_subset_is_valid_json(self):
+        """Regression test: eoio:subset used to be repr(self.subset), Python-only
+        syntax (e.g. single quotes) that isn't parseable JSON."""
+        meta = self._make_meta()
+        md = meta.get_basic_metadata()
+
+        parsed = json.loads(md["eoio:subset"])
+        self.assertEqual(parsed["roi"], [0, 1, 2, 3])
 
 
 if __name__ == "__main__":

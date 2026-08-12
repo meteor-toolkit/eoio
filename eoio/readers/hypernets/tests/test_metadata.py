@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest import mock
 import xarray as xr
@@ -43,6 +44,43 @@ class TestMetadata(unittest.TestCase):
         assert basic_md["collection_name"] == "site"
         assert basic_md["product_name"] == "prod"
         assert basic_md["platform"] == "HYPERNETS"
+
+    @mock.patch("eoio.readers.base.os.path.exists", return_value=True)
+    @mock.patch("eoio.readers.generic_netcdf.reader.xr.open_dataset")
+    def test_eoio_subset_is_valid_json_by_default(self, mock_open_dataset, mock_exists):
+        """Regression test: eoio:subset used to be repr(self.subset), Python-only
+        syntax (e.g. single quotes) that isn't parseable JSON. HYPERNETSReader's
+        default_subset is always merged in (non-empty), so this is exercised even
+        without an explicit subset kwarg."""
+        ds = xr.Dataset()
+        ds["acquisition_time"] = xr.DataArray([1772106654], dims=["time"])
+        ds.attrs["site_latitude"] = 1.0
+        ds.attrs["site_longitude"] = 2.0
+        ds.attrs["site_id"] = "site"
+        ds.attrs["product_name"] = "prod"
+        ds.attrs["product_level"] = "L1"
+        ds.attrs["product_date"] = "2020-01-01"
+        reader = HYPERNETSReader("dummy_path")
+        basic_md = HYPERNETSMetadataExtractor(reader, ds).get_basic_metadata()
+
+        json.loads(basic_md["eoio:subset"])  # raises if not valid JSON
+
+    @mock.patch("eoio.readers.base.os.path.exists", return_value=True)
+    @mock.patch("eoio.readers.generic_netcdf.reader.xr.open_dataset")
+    def test_eoio_subset_reflects_explicit_subset(self, mock_open_dataset, mock_exists):
+        ds = xr.Dataset()
+        ds["acquisition_time"] = xr.DataArray([1772106654], dims=["time"])
+        ds.attrs["site_latitude"] = 1.0
+        ds.attrs["site_longitude"] = 2.0
+        ds.attrs["site_id"] = "site"
+        ds.attrs["product_name"] = "prod"
+        ds.attrs["product_level"] = "L1"
+        ds.attrs["product_date"] = "2020-01-01"
+        reader = HYPERNETSReader("dummy_path", subset={"wavelength": {"min": 400, "max": 900}})
+        basic_md = HYPERNETSMetadataExtractor(reader, ds).get_basic_metadata()
+
+        parsed = json.loads(basic_md["eoio:subset"])
+        assert parsed["wavelength"] == {"min": 400, "max": 900}
 
 
 if __name__ == "__main__":

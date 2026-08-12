@@ -31,7 +31,9 @@ User config example::
         "stack.cubes": {},
     }
 
-    # Use wavelength values as the stacking coordinate:
+    # Use wavelength values as the stacking coordinate (the original per-band
+    # variable names, e.g. "B02", are kept too, as a "<stack_dim>_name" auxiliary
+    # coordinate on the same dimension):
     processors = {
         "stack.cubes": {"dim_coord_attr": "central_wavelength"},
     }
@@ -54,6 +56,7 @@ User config example::
 
 from __future__ import annotations
 
+import json
 import warnings
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -82,7 +85,13 @@ class StackCubes(BaseProcessor):
     By default, variables are sorted lexicographically by name and the stacking
     coordinate contains the original variable names. When ``dim_coord_attr`` is
     set, coordinate values are taken from the named attribute on each variable
-    and the stacking order follows the attribute values (ascending).
+    and the stacking order follows the attribute values (ascending); the original
+    variable names are then kept too, as a same-dim ``<dim_name>_name`` auxiliary
+    coordinate, so identity (e.g. ``"B02"``) is never lost in favour of the
+    physical quantity (e.g. wavelength), or vice versa. If any variable in a
+    group is missing the resolved ``dim_coord_attr`` value, the whole group falls
+    back to variable names as the (sole) stacking coordinate -- see
+    :py:func:`_sort_group`.
 
     Processor parameters
     --------------------
@@ -97,8 +106,12 @@ class StackCubes(BaseProcessor):
         coordinate instead of the variable name. A simple key such as
         ``"central_wavelength"`` reads ``da.attrs["central_wavelength"]``;
         a dotted path such as ``"product_metadata.central_wavelength"``
-        traverses nested dicts. If any variable in a group is missing the
+        traverses nested dicts (tolerating a dict step that was already
+        JSON-stringified, e.g. by a reader making it netCDF-safe -- it's parsed
+        back before continuing). If any variable in a group is missing the
         resolved value, the group falls back to variable names as coordinates.
+        When resolution succeeds, the original variable names are additionally
+        kept as a ``<dim_name>_name`` auxiliary coordinate.
         Default: ``None`` (use variable names).
     :param drop_originals:
         If ``True`` (default), remove the original per-variable entries from the
@@ -210,6 +223,16 @@ class StackCubes(BaseProcessor):
                     cube[dim_name].attrs["units"] = coord_units
             if self.dim_attrs:
                 cube[dim_name].attrs.update(self.dim_attrs)
+            if self.dim_coord_attr and ordered != coord_values:
+                # dim_coord_attr resolved to something other than the variable names
+                # themselves (e.g. a wavelength) -- keep the original per-variable names
+                # too, as a same-dim auxiliary coordinate, so identity (e.g. "B02") isn't
+                # silently lost in favour of the physical quantity, or vice versa. Skipped
+                # when dim_coord_attr fell back to names (ordered == coord_values; see
+                # _sort_group) since the two would be identical.
+                name_coord = f"{dim_name}_name"
+                cube = cube.assign_coords({name_coord: (dim_name, ordered)})
+                cube[name_coord].attrs["long_name"] = "Original per-band variable name"
             if ancillary_cube_names:
                 cube.attrs["ancillary_variables"] = " ".join(ancillary_cube_names)
 
@@ -379,10 +402,20 @@ def _get_nested_attr(da: xr.DataArray, attr_path: str) -> Any:
     ``"product_metadata.central_wavelength"`` returns
     ``da.attrs["product_metadata"]["central_wavelength"]``.
 
+    A dict-valued step that has already been JSON-stringified (e.g. a reader
+    that serialised ``product_metadata`` to a netCDF-safe string before this
+    processor ran) is transparently parsed back into a dict before descending
+    further, so the lookup still succeeds either way.
+
     Returns ``None`` if any key in the path is missing.
     """
     val: Any = da.attrs
     for key in attr_path.split("."):
+        if isinstance(val, str):
+            try:
+                val = json.loads(val)
+            except ValueError:
+                return None
         if not isinstance(val, dict):
             return None
         val = val.get(key)

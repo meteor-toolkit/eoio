@@ -22,6 +22,7 @@ parsing.
 """
 
 from __future__ import annotations
+import json
 from eoio.readers.metadata import BaseMetadataExtractor
 from eoio.readers.sentinel3_olci.metadata.s3_olci_mtd import S3OLCIXMLReader
 from eoio.readers.sentinel3_olci.metadata.var_names import AUX_OPTIONS, MASK_OPTIONS
@@ -139,7 +140,9 @@ class S3OLCIMetadataExtractor(BaseMetadataExtractor):
                 ),
             }
             if self.subset:
-                basic_md["eoio:subset"] = self.subset
+                # json.dumps keeps this parseable JSON and netCDF-attribute-safe (a raw
+                # dict isn't), matching the eoio:subset convention used elsewhere.
+                basic_md["eoio:subset"] = json.dumps(self.subset, default=str)
             basic_md["eoio:reader"] = "sentinel3_olci"
 
             return basic_md

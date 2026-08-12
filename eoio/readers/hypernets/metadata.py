@@ -21,6 +21,7 @@ Functions
    get_basic_metadata
 """
 
+import json
 import warnings
 
 import xarray as xr
@@ -124,7 +125,11 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
             "product_date": str(date),
             "description": "TBD",
             "eoio:reader": "hypernets",
-            "eoio:subset": repr(self.subset),
+            # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset
+            # convention used elsewhere -- repr() produces Python-only syntax (e.g. single
+            # quotes) that isn't valid JSON. default=str covers subset values that aren't
+            # natively JSON-serialisable (e.g. a shapely ROI geometry).
+            "eoio:subset": json.dumps(self.subset, default=str) if self.subset else "",
             "footprint": normalize_footprint(
                 geometry_input=f"POINT ({lon} {lat})",
                 crs_input=4326,  # HYPERNETS uses WGS84 (EPSG:4326) coordinates
