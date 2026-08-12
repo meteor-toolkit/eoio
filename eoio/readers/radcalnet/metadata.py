@@ -126,6 +126,8 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
         lat = self.ds.attrs["Lattitude"]
         lon = self.ds.attrs["Longitude"]
         name = self.ds.attrs["Site"][0:4]
+        if name not in ROI_DEFINITIONS:
+            warnings.warn(f"Site {name!r} has no known ROI definition; spatial_resolution will be left unset")
         basic_md = {
             "collection_name": f"{name} {self.ds.attrs['collection']}",
             "collection": self.ds.attrs["collection"],
@@ -133,7 +135,7 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
             "platform": "RadCalNet",
             "name": self.ds.attrs["Site"],
             "processing_level": "L1",
-            "spatial_resolution": ROI_DEFINITIONS[name],
+            "spatial_resolution": ROI_DEFINITIONS.get(name, ""),
             "spatial_resolution_units": "m",
             "geometry_ids": "insitu",
             "product_bounds": f"POINT ({lon} {lat})",

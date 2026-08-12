@@ -96,6 +96,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             + "T"
             + self.prod_hdf_reader.attrs.get("RANGEBEGINNINGTIME", "TBC"),
             "description": "TBD",
+            "eoio:reader": "modis",
         }
 
         return basic_md

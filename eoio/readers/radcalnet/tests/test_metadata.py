@@ -93,6 +93,19 @@ class testGetBasicMetadata(unittest.TestCase):
         self.assertEqual(md["spatial_resolution"], ROI_DEFINITIONS["GONA"])
         self.assertEqual(md["spatial_resolution_units"], "m")
 
+    def test_unknown_site_warns_and_falls_back_instead_of_raising(self):
+        """ROI_DEFINITIONS only covers the 8 known RadCalNet sites; a site code
+        outside that set used to raise KeyError from a bare dict subscript instead
+        of degrading gracefully like every other missing-metadata case in this
+        extractor (see get_variable_product_metadata's min_basic_var_metadata_keys
+        handling, which warns and falls back to "")."""
+        extractor = RadCalNetMetadataExtractor(_FakeReader(), _make_ds(site="ZZZZ01"))
+
+        with self.assertWarns(UserWarning):
+            md = extractor.get_basic_metadata()
+
+        self.assertEqual(md["spatial_resolution"], "")
+
 
 class testGetVariableProductMetadata(unittest.TestCase):
     """Regression test: get_variable_product_metadata() used to be named
