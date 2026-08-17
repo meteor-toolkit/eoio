@@ -76,6 +76,7 @@ class LSMetadataExtractor(BaseMetadataExtractor):
             "geometry_ids": geoms,
             "product_bounds": self.xml_reader.find_bounds(),
             "product_date": self.xml_reader.find_acquisition_date().isoformat(),
+            "product_datetime": self.xml_reader.find_acquisition_datetime().isoformat(),
             "description": "TBD",
             "epsg": self.json_reader.find_epsg(),
             "institution": "NASA / USGS",

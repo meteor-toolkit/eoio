@@ -118,11 +118,12 @@ class ReaderFactory:
 
             return MODISReader
 
-        elif re.search(ERA5_pattern, path):
-            from eoio.readers.era5.reader import ERA5Reader
+        elif re.search(CAMS_pattern, path) or re.search(ERA5_pattern, path):
+            from eoio.readers.ecmwf.reader import ECMWFReader
 
-            return ERA5Reader
-        elif re.search(CAMS_pattern, path) or re.search(FLOX_pattern, path) or re.search(nc_pattern, path):
+            return ECMWFReader
+
+        elif re.search(FLOX_pattern, path) or re.search(nc_pattern, path):
             from eoio.readers.generic_netcdf.reader import NetCDFReader
 
             return NetCDFReader

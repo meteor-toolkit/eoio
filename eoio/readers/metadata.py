@@ -221,6 +221,7 @@ class BaseMetadataExtractor(ABC):
             "geometry_ids": "",
             "product_bounds": "",
             "product_date": "",
+            "product_datetime": "",
             "description": "",
             "eoio:reader": "",
             "eoio:subset": "",

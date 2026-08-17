@@ -129,6 +129,9 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
         name = self.ds.attrs["Site"][0:4]
         if name not in ROI_DEFINITIONS:
             warnings.warn(f"Site {name!r} has no known ROI definition; spatial_resolution will be left unset")
+        # This reader covers a time series of many observations, so there is no single
+        # instant to report -- product_datetime is intentionally omitted (unlike
+        # single-acquisition readers) since product_date only reflects the first timestamp.
         basic_md = {
             "collection_name": f"{name} {self.ds.attrs['collection']}",
             "collection": self.ds.attrs["collection"],

@@ -112,6 +112,9 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
         """
         lat = self.ds.attrs["site_latitude"]
         lon = self.ds.attrs["site_longitude"]
+        # This reader covers a time series of many observations, so there is no single
+        # instant to report -- product_datetime is intentionally omitted (unlike
+        # single-acquisition readers) since date is the mean acquisition date, not a datetime.
         date = convert_datetime(np.nanmean(self.ds.acquisition_time.values)).date()
         basic_md = {
             "collection_name": self.ds.attrs["site_id"],

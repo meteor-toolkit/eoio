@@ -35,9 +35,7 @@ class TestMetadata(unittest.TestCase):
         meta.reader.config = MagicMock()
         meta.reader.config.subset = {"roi": [0, 1, 2, 3]}
         meta.get_product_metadata = metadata.EMITMetadataExtractor.get_product_metadata.__get__(meta)
-        meta.get_variable_product_metadata = metadata.EMITMetadataExtractor.get_variable_product_metadata.__get__(
-            meta
-        )
+        meta.get_variable_product_metadata = metadata.EMITMetadataExtractor.get_variable_product_metadata.__get__(meta)
         meta.get_variable_basic_metadata = metadata.EMITMetadataExtractor.get_variable_basic_metadata.__get__(meta)
         meta.get_basic_metadata = metadata.EMITMetadataExtractor.get_basic_metadata.__get__(meta)
         return meta
@@ -72,6 +70,8 @@ class TestMetadata(unittest.TestCase):
         self.assertIn("platform", md)
         self.assertIn("product_bounds", md)
         self.assertIn("history", md)
+        self.assertEqual(md["product_date"], "2020-01-01")
+        self.assertEqual(md["product_datetime"], "2020-01-01T00:00:00")
 
     def test_eoio_subset_is_valid_json(self):
         """Regression test: eoio:subset used to be repr(self.subset), Python-only

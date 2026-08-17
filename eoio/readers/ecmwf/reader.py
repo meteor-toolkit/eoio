@@ -1,15 +1,15 @@
 """
-eoio.readers.hypernets.reader
-=============================
+eoio.readers.ecmwf.reader
+=========================
 
-Sentinel-2 MSI data reader implementation for HYPERNETS.
+ECMWF data reader implementation.
 
 Classes
 -------
 .. autosummary::
    :toctree: generated/
 
-   HYPERNETSReader
+   ECMWFReader
 
 Functions
 ---------
@@ -28,7 +28,7 @@ from eoio.readers.generic_netcdf.metadata import GenericNetCDFMetadataExtractor
 from eoio.readers.generic_netcdf.reader import NetCDFReader
 
 
-class ERA5Reader(NetCDFReader):
+class ECMWFReader(NetCDFReader):
     """
     Reader for generic NetCDF data.
     """
@@ -63,13 +63,15 @@ class ERA5Reader(NetCDFReader):
             os.path.join(os.path.dirname(path), "data_stream-oper_stepType-instant.nc")
         ):
             path = os.path.join(os.path.dirname(path), "data_stream-oper_stepType-instant.nc")
+        if (not os.path.exists(path)) and os.path.exists(os.path.join(os.path.dirname(path), "data_sfc.nc")):
+            path = os.path.join(os.path.dirname(path), "data_sfc.nc")
         super().__init__(path, vars_sel, subset, read_params)
 
     def open_dataset(self) -> xr.Dataset:
         """
-        Open the HYPERNETS dataset as an xarray.Dataset according to the request parameters.
+        Open the ECMWF dataset as an xarray.Dataset according to the request parameters.
 
-        :returns: The opened and subsetted HYPERNETS dataset.
+        :returns: The opened and subsetted ECMWF dataset.
         """
 
         # open data

@@ -36,6 +36,9 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.mock_xml.find_processing_level.return_value = "L1TP"
         self.mock_xml.find_collection_number.return_value = "02"
         self.mock_xml.find_acquisition_date.return_value = dt.datetime(2025, 5, 19, 10, 42, 12, tzinfo=dt.timezone.utc)
+        self.mock_xml.find_acquisition_datetime.return_value = dt.datetime(
+            2025, 5, 19, 10, 42, 12, tzinfo=dt.timezone.utc
+        )
 
         # Product-level metadata
         self.mock_xml.find_collection_category.return_value = "TIER_1"
@@ -118,6 +121,7 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.assertIn("footprint", basic)
         self.assertIsInstance(basic["footprint"], dict)
         self.assertEqual(basic["footprint"]["crs"], "EPSG:32630")
+        self.assertEqual(basic["product_datetime"], "2025-05-19T10:42:12+00:00")
 
     def test_get_product_metadata_ReturnsCorrectStructure(self):
         pm = self.extractor.get_product_metadata()

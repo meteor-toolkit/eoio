@@ -472,8 +472,12 @@ def _write_synthetic_ascii_file(suffix: str) -> str:
     def row(v):
         return "\t".join([str(v)] * n)
 
-    utc_times = [(datetime.datetime(2021, 1, 1, 8, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)]
-    local_times = [(datetime.datetime(2021, 1, 1, 9, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)]
+    utc_times = [
+        (datetime.datetime(2021, 1, 1, 8, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)
+    ]
+    local_times = [
+        (datetime.datetime(2021, 1, 1, 9, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)
+    ]
 
     lines = [
         "Site:\tGONA01",

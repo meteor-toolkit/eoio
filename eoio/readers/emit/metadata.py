@@ -136,6 +136,7 @@ class EMITMetadataExtractor(BaseMetadataExtractor):
             "geometry_ids": "60m",
             "product_bounds": self.subset["roi"],
             "product_date": self.reader.ds_src.time_coverage_end.split("T")[0],  # type: ignore[attr-defined]
+            "product_datetime": self.reader.ds_src.time_coverage_end,  # type: ignore[attr-defined]
             "description": self.reader.ds_src.summary,  # type: ignore[attr-defined]
             "eoio:reader": "emit",
             # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset

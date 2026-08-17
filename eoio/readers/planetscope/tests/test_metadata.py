@@ -219,6 +219,8 @@ class TestPlanetScopeMetadataExtractor(unittest.TestCase):
         self.assertIn("platform", metadata)
         self.assertIn("processing_level", metadata)
         self.assertIn("product_date", metadata)
+        self.assertEqual(metadata["product_date"], "2022-04-01")
+        self.assertEqual(metadata["product_datetime"], "2022-04-01T08:47:07")
         self.assertIn("footprint", metadata)
         self.assertIsInstance(metadata["footprint"], dict)
         self.assertTrue(metadata["footprint"]["crs"].startswith("EPSG:"))

@@ -122,6 +122,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         tl.find_horizontal_cs_code.return_value = "EPSG:32630"
 
         prod.find_product_start_date.return_value = dt.date(2025, 11, 28)
+        prod.find_product_start_datetime.return_value = dt.datetime(2025, 11, 28, 10, 15, 30, tzinfo=dt.timezone.utc)
 
         ex = S2MSIMetadataExtractor(reader)
         md = ex.get_basic_metadata()
@@ -138,6 +139,7 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
 
         self.assertEqual(md["geospatial_bounds"], "POLYGON((...))")
         self.assertEqual(md["product_date"], dt.date(2025, 11, 28))
+        self.assertEqual(md["product_datetime"], dt.datetime(2025, 11, 28, 10, 15, 30, tzinfo=dt.timezone.utc))
         self.assertIn("description", md)
         self.assertIn("footprint", md)
         self.assertIsInstance(md["footprint"], dict)

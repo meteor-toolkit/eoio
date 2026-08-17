@@ -85,6 +85,27 @@ class TestMODISMetadataExtractor(unittest.TestCase):
 
             self.assertEqual(metadata["eoio:reader"], "modis")
 
+    def test_get_basic_metadata_product_date_and_datetime(self):
+        """product_date should be date-only; product_datetime should combine date and time."""
+        with patch("eoio.readers.modis.metadata.extractor.modis_prod_mtd_reader_factory") as mock_factory:
+            mock_reader = MagicMock()
+            mock_reader.attrs = {
+                "LONGNAME": "Test",
+                "SHORTNAME": "TST",
+                "PRODUCT_NAME": "MOD02",
+                "ASSOCIATEDPLATFORMSHORTNAME.1": "Terra",
+                "ASSOCIATEDINSTRUMENTSHORTNAME.1": "MODIS",
+                "RANGEBEGINNINGDATE": "2020-01-01",
+                "RANGEBEGINNINGTIME": "03:04:05",
+            }
+            mock_factory.return_value = mock_reader
+
+            extractor = MODISMetadataExtractor(self.reader)
+            metadata = extractor.get_basic_metadata()
+
+            self.assertEqual(metadata["product_date"], "2020-01-01")
+            self.assertEqual(metadata["product_datetime"], "2020-01-01T03:04:05")
+
     def test_meas_var_band_ids_set_correctly(self):
         """Test that measurement variable band IDs are set during initialization."""
         with patch("eoio.readers.modis.metadata.extractor.modis_prod_mtd_reader_factory"):

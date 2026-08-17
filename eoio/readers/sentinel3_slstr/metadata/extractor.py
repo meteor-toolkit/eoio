@@ -63,6 +63,7 @@ class S3SLSTRMetadataExtractor(BaseMetadataExtractor):
             img = self.xml_reader.find_image_size()
             rows = img.get("rows")
             cols = img.get("columns")
+            acquisition_start_datetime = self.xml_reader.find_acquisition_start_datetime()
 
             basic = {
                 "collection_name": self.xml_reader.find_product_type(),
@@ -72,7 +73,8 @@ class S3SLSTRMetadataExtractor(BaseMetadataExtractor):
                 "processing_level": "L1",
                 "processing_version": self.xml_reader.find_processing_baseline(),
                 "product_bounds": self.xml_reader.find_bounds().wkt,
-                "product_date": self.xml_reader.find_acquisition_start_datetime().date(),
+                "product_date": acquisition_start_datetime.date(),
+                "product_datetime": acquisition_start_datetime,
                 "image_size": f"{rows}x{cols}" if rows and cols else None,
                 "eoio:reader": "sentinel3_slstr",
                 "footprint": normalize_footprint(
