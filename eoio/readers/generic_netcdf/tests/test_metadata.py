@@ -26,6 +26,21 @@ class TestGenericNetCDFMetadataExtractor(unittest.TestCase):
         self.assertIsInstance(metadata, dict)
         self.assertIn("title", self.ds.attrs)
 
+    def test_product_datetime_passes_through_from_source_attrs(self):
+        ds = xr.Dataset(
+            {"var1": ("series", [1, 2])},
+            attrs={"product_date": "2023-01-15", "product_datetime": "2023-01-15T10:30:45"},
+        )
+        extractor = GenericNetCDFMetadataExtractor(self.reader, ds)
+        md = extractor.get_basic_metadata()
+        self.assertEqual(md["product_date"], "2023-01-15")
+        self.assertEqual(md["product_datetime"], "2023-01-15T10:30:45")
+
+    def test_product_datetime_defaults_to_empty_string_when_absent(self):
+        extractor = GenericNetCDFMetadataExtractor(self.reader, self.ds)
+        md = extractor.get_basic_metadata()
+        self.assertEqual(md["product_datetime"], "")
+
     def test_eoio_subset_is_empty_string_when_no_subset(self):
         # "" (not None) -- an attr value of None can't be written to netCDF.
         extractor = GenericNetCDFMetadataExtractor(self.reader, self.ds)

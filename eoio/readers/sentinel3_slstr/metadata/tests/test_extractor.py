@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import MagicMock
 from types import SimpleNamespace
 from pathlib import Path
+import datetime as dt
 import tempfile
 
 
@@ -62,6 +63,8 @@ class TestS3SLSTRMetadataExtractor(unittest.TestCase):
         self.assertIn("footprint", basic)
         self.assertIsInstance(basic["footprint"], dict)
         self.assertEqual(basic["footprint"]["crs"], "EPSG:4326")
+        self.assertEqual(basic["product_date"], dt.date(2024, 1, 2))
+        self.assertEqual(basic["product_datetime"], dt.datetime(2024, 1, 2, 3, 4, 5, tzinfo=dt.timezone.utc))
 
         pm = extractor.get_product_metadata()
         self.assertIsInstance(pm, dict)

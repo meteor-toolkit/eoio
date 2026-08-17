@@ -105,7 +105,8 @@ class PlanetScopeMetadataExtractor(BaseMetadataExtractor):
                 for meas_var in self.reader.meas_var_res.keys()  # type: ignore[attr-defined]
             ],
             "product_geospatial_bounds": get_value(full_prod_metadata, "bbox"),  # gets EPSG:4326
-            "product_date": str(date),
+            "product_date": str(date.date()),
+            "product_datetime": date.isoformat(),
             "description": "TBD",
             "institution": "Planet",
             "keywords": [

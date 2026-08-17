@@ -112,6 +112,7 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
             "geometry_ids": geoms,
             "geospatial_bounds": self.prod_xml_reader.find_bounds().wkt,
             "product_date": self.prod_xml_reader.find_product_start_date(),
+            "product_datetime": self.prod_xml_reader.find_product_start_datetime(),
             "description": "TBD",
             "footprint": normalize_footprint(
                 geometry_input=self.prod_xml_reader.find_bounds(),
