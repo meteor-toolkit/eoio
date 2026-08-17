@@ -112,10 +112,8 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
         """
         lat = self.ds.attrs["site_latitude"]
         lon = self.ds.attrs["site_longitude"]
-        # This reader covers a time series of many observations, so there is no single
-        # instant to report -- product_datetime is intentionally omitted (unlike
-        # single-acquisition readers) since date is the mean acquisition date, not a datetime.
-        date = convert_datetime(np.nanmean(self.ds.acquisition_time.values)).date()
+        datetime = convert_datetime(np.nanmean(self.ds.acquisition_time.values))
+        date = datetime.date()
         basic_md = {
             "collection_name": self.ds.attrs["site_id"],
             "product_name": self.ds.attrs["product_name"],
@@ -126,6 +124,7 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
             "geometry_ids": "insitu",
             "product_bounds": f"POINT ({lon} {lat})",
             "product_date": str(date),
+            "product_datetime": datetime,
             "description": "TBD",
             "eoio:reader": "hypernets",
             # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset
