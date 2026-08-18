@@ -34,6 +34,7 @@ class ReaderFactory:
         S2MSIL1C_pattern = re.compile(r"S2.?_MSIL1C_.*")  # S2-MSI L1c
         S2MSIL2A_pattern = re.compile(r"S2.?_MSIL2A_.*")  # S2-MSI L2a
         hypernets_L1Irr_pattern = re.compile(r"HYPERNETS.*L1.*IRR.*")
+        hypernets_L1Rad_pattern = re.compile(r"HYPERNETS.*L1.*RAD.*")
         hypernets_L2_pattern = re.compile(r"HYPERNETS.*L2.*")
         radcalnet_TOA_pattern = re.compile(r".*.v*.*.output")
         radcalnet_BOA_pattern = re.compile(r".*.v*.*.input")
@@ -77,6 +78,11 @@ class ReaderFactory:
             from eoio.readers.hypernets.reader import HYPERNETSL1IrrReader
 
             return HYPERNETSL1IrrReader
+
+        elif re.search(hypernets_L1Rad_pattern, path):
+            from eoio.readers.hypernets.reader import HYPERNETSL1RadReader
+
+            return HYPERNETSL1RadReader
 
         elif re.search(hypernets_L2_pattern, path):
             from eoio.readers.hypernets.reader import HYPERNETSL2RefReader

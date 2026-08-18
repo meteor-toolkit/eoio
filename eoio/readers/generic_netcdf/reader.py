@@ -33,11 +33,11 @@ class NetCDFReader(BaseReader):
     """
 
     def __init__(self, path, vars_sel=None, subset=None, read_params=None):
-        super().__init__(path, vars_sel, subset, read_params)
-        self.ds_src = xr.open_dataset(self.path)
+        self.ds_src = xr.open_dataset(path)
         self.meas_def = {
             "all": list(self.ds_src.variables),
         }
+        super().__init__(path, vars_sel, subset, read_params)
 
     def open_dataset(self) -> xr.Dataset:
         """

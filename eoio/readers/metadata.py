@@ -81,7 +81,7 @@ class BaseMetadataExtractor(ABC):
         var_md = {}
         var_basic_md = {}
 
-        if level == "all":
+        if level == "all" or level == "basic":
             md = self.product_metadata
             for var in self.reader.list_include_vars():
                 var_md[var] = self.variable_product_metadata(var)
@@ -148,6 +148,11 @@ class BaseMetadataExtractor(ABC):
         basic_md, md, var_basic_md, var_md = self.extract_metadata(level=level, meas_list=meas_in_ds)
 
         out.attrs.update(basic_md)
+        for var, vmd in var_basic_md.items():
+            if var in out:
+                out[var].attrs = dict(out[var].attrs)
+                out[var].attrs.update(var_basic_md.get(var, {}))
+
         if level == "all":
             if md:
                 out.attrs["product_metadata"] = md
@@ -155,7 +160,6 @@ class BaseMetadataExtractor(ABC):
             for var, vmd in var_md.items():
                 if var in out:
                     out[var].attrs = dict(out[var].attrs)
-                    out[var].attrs.update(var_basic_md.get(var, {}))
                     if vmd:
                         out[var].attrs["product_metadata"] = vmd
 
