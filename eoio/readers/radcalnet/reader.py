@@ -65,10 +65,16 @@ class RadCalNetReader(BaseReader):
             "min": 400,
             "max": 2500,
         },  # TODO: BTCN has a smaller default subset
-        "time_of_day_utc": {  # Changed from "time_utc" to "time_of_day_UTC"
-            "min": "08:00",
-            "max": "14:00",
-        },
+        # No default time_of_day_utc filter: this used to be hardcoded to
+        # 08:00-14:00 UTC for every site, which only worked by coincidence
+        # for sites whose local daylight happens to fall in that range (e.g.
+        # GONA). Each file's own recorded rows are already restricted to
+        # that site's actual daylight window (see scrappi's
+        # RadcalnetCallHandler._daylight_window_hours, computed from the
+        # site's longitude), so no additional universal clock-time filter is
+        # needed here -- callers that do want to narrow further can still
+        # pass time_of_day_utc/time_of_day_local/angle explicitly.
+        "time_of_day_utc": None,
         "time_of_day_local": None,
         "angle": None,
         "datetime": None,
@@ -183,7 +189,6 @@ class RadCalNetReader(BaseReader):
             include_vars=include_vars,
             subset=subset,
         )
-
         # get metadata
         if "input" in self.get_extension():
             ds.attrs["collection"] = "Bottom of Atmosphere"

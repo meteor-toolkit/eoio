@@ -315,6 +315,28 @@ class testRadCalNetReader(unittest.TestCase):
         opts = reader.all_options
         assert isinstance(opts, dict)
 
+    def test_default_subset_has_no_universal_time_of_day_utc_filter(self):
+        """Regression test: default_subset["time_of_day_utc"] used to be
+        hardcoded to 08:00-14:00 UTC for every site, which only worked by
+        coincidence for sites whose local daylight happens to fall in that
+        range (e.g. GONA). For a site whose real daylight window is
+        elsewhere in UTC (e.g. RVUS, ~15:00-21:00 UTC), a caller that reads
+        without an explicit time_of_day_utc override -- as
+        eomatch.datatree.BuildMUDT.read_products does, passing only
+        roi/roi_crs -- would have every row filtered out and
+        eoio.readers.radcalnet.subset.build_subset would raise "The subset
+        criteria resulted in an empty dataset.", even though the file's own
+        recorded rows are already correctly restricted to that site's actual
+        daylight window (see scrappi's own per-site fix,
+        RadcalnetCallHandler._daylight_window_hours)."""
+        self.assertIsNone(RadCalNetReader.default_subset["time_of_day_utc"])
+
+        # Confirm this holds through the real merge path too (subset=None
+        # means "use the reader's own defaults", exactly as eomatch's
+        # BuildMUDT effectively does for any key it doesn't explicitly set).
+        reader = DummyReader(path=".", vars_sel=None, subset=None, read_params=None)
+        self.assertIsNone(reader.config.subset["time_of_day_utc"])
+
     def test_open_dataset(self):
         reader = DummyReader(path=".", vars_sel=None, subset=None, read_params=None)
         ds = reader.open_dataset()

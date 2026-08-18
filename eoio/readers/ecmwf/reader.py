@@ -21,13 +21,12 @@ from __future__ import annotations
 import xarray as xr
 import os.path
 from eoio.readers.base import ReaderConfig
-from eoio.readers.ecmwf.subset import build_subset
 from eoio.readers.generic_netcdf.data_io import read_dataset
-
+from eoio.deps import lazy_rioxarray
 # from eoio.readers.hypernets.aux import maybe_add_aux
 from eoio.readers.generic_netcdf.metadata import GenericNetCDFMetadataExtractor
 from eoio.readers.generic_netcdf.reader import NetCDFReader
-
+from eoio.readers.generic_netcdf.subset import build_subset
 
 class ECMWFReader(NetCDFReader):
     """
@@ -43,14 +42,7 @@ class ECMWFReader(NetCDFReader):
     default_subset = {
         "roi": None,
         "roi_crs": 4326,
-        "datetime": [
-            "min",
-            "max",
-            "nearest",
-            "tolerance_days",
-            "tolerance_hours",
-            "tolerance_minutes",
-        ],
+        "datetime": None,
     }
 
     default_read = {"save_extracted": False, "metadata_level": "all"}
@@ -82,14 +74,13 @@ class ECMWFReader(NetCDFReader):
             "all": list(ds.variables),
         }
 
-        self.resolved_config = ReaderConfig(
-            vars_sel=self.resolved_vars_sel(),
-            subset=self.resolve_subset(self.config.subset),
-            read_params=self.config.read_params,
-        )
+        rio = lazy_rioxarray()
+        image_crs = str(ds.rio.crs)
+        if image_crs is None or image_crs=="None":
+            ds = ds.rio.write_crs("EPSG:4326")
 
         # Build the subset
-        build_subset(
+        subset = build_subset(
             ds,
             subset=self.config.subset,
         )
@@ -101,7 +92,7 @@ class ECMWFReader(NetCDFReader):
         ds = read_dataset(
             ds=ds,
             include_vars=include_vars,
-            subset=None,  # ERA5 uses ROI subsetting, not wavelength subsetting
+            subset=subset,  # ERA5 uses ROI subsetting, not wavelength subsetting
         )
 
         # attach metadata
