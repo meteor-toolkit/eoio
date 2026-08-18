@@ -11,9 +11,10 @@ class CopernicusDEMLayout:
     edm: Path | None
     hem: Path | None
 
-    def metadata_file(self): 
+    def metadata_file(self):
         return self.xml
-    
+
+
 def get_layout(product_dir: str | Path) -> CopernicusDEMLayout:
     product_dir = Path(product_dir)
 
@@ -25,4 +26,3 @@ def get_layout(product_dir: str | Path) -> CopernicusDEMLayout:
         edm=next(product_dir.glob("AUXFILES/*_EDM.tif"), None),
         hem=next(product_dir.glob("AUXFILES/*_HEM.tif"), None),
     )
-

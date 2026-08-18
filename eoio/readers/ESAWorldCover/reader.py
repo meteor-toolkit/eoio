@@ -4,7 +4,6 @@ eoio.readers.generic_tif.reader
 
 from __future__ import annotations
 
-import rioxarray as rxr
 import xarray as xr
 from pathlib import Path
 

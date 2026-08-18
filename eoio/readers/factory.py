@@ -133,13 +133,14 @@ class ReaderFactory:
 
         elif re.search(copernicus_dem_pattern, path):
             from eoio.readers.copernicus_dem.reader import CopernicusDEMReader
-            
+
             return CopernicusDEMReader
-        
+
         elif re.search(esa_world_cover_pattern, path):
             from eoio.readers.ESAWorldCover.reader import ESAWorldCoverReader
+
             return ESAWorldCoverReader
-        
+
         elif re.search(FLOX_pattern, path) or re.search(nc_pattern, path):
             from eoio.readers.generic_netcdf.reader import NetCDFReader
 

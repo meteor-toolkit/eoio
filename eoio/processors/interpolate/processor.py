@@ -34,7 +34,6 @@ class InterpolateConfig:
     """
 
     coords: Sequence[str]
-    interpolate_mode: str
     target_grid: Sequence
     data_vars: Optional[Sequence[str]] = None
     method: str = "linear"
@@ -119,15 +118,6 @@ class Interpolate(BaseProcessor):
 
         coords = params["coords"]
 
-        if any([("x" in c) or ("y" in c) for c in coords]):
-            interpolate_mode = "xy"
-        elif any([("latitude" in c) or ("longitude" in c) for c in coords]):
-            interpolate_mode = "lat_lon"
-        else:
-            raise ValueError(
-                "interpolate: unable to determine interpolation mode from 'coords' parameter. Expected coordinate names to contain 'x_'/'y_' for xy interpolation or 'latitude'/'longitude' for lat/lon interpolation."
-            )
-
         # resolve "target_grid" param
         if "target_grid" not in params:
             raise ValueError("interpolate: missing required param 'target_grid' (e.g. ['x_60m']).")
@@ -161,7 +151,6 @@ class Interpolate(BaseProcessor):
             method=method,
             inplace=inplace,
             on_missing=on_missing,
-            interpolate_mode=interpolate_mode,
         )
 
     def _format_target_grid(self, ds: xr.Dataset, target_grid: Sequence) -> Sequence:
@@ -211,9 +200,9 @@ class Interpolate(BaseProcessor):
         # Format the coordinates
         return coords
 
-    def _run_xy(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
+    def _run_dims(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
         """
-        Run interpolation on x/y coordinates.
+        Run interpolation on dataset dimensions.
 
         :param ds:
             Input dataset.
@@ -380,9 +369,9 @@ class Interpolate(BaseProcessor):
 
         return ds
 
-    def _run_lat_lon(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
+    def _run_coords(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
         """
-        Run interpolation on latitude/longitude coordinates.
+        Run interpolation on dataset coordinates.
 
         :param ds:
             Input dataset.
@@ -542,12 +531,21 @@ class Interpolate(BaseProcessor):
 
         coords = self._format_coords(ds, self.interpolate_config.coords)
         target_coords = self._format_target_grid(ds, self.interpolate_config.target_grid)
-        if self.interpolate_config.interpolate_mode == "xy":
-            ds = self._run_xy(ds, coords, target_coords)
-        elif self.interpolate_config.interpolate_mode == "lat_lon":
-            ds = self._run_lat_lon(ds, coords, target_coords)
+
+        if any([c in ds.dims for c in coords]):
+            interpolate_mode = "dims"
+        elif any([c in ds.coords for c in coords]):
+            interpolate_mode = "coords"
         else:
-            raise ValueError("interpolate: invalid 'interpolate_mode'. Expected 'xy' or 'lat_lon'.")
+            raise ValueError(
+                "interpolate: unable to determine interpolation mode from 'coords' parameter. Interpolation coordinates must either be coordinates or dimensions of input dataset."
+            )
+
+        if interpolate_mode == "dims":
+            ds = self._run_dims(ds, coords, target_coords)
+        elif interpolate_mode == "coords":
+            ds = self._run_coords(ds, coords, target_coords)
+
         # Record processing history
         ds = self._record_provenance(ds)
 

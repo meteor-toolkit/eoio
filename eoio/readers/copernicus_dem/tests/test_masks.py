@@ -10,7 +10,6 @@ from eoio.readers.copernicus_dem.masks import (
 
 
 class TestAddMasks(unittest.TestCase):
-
     @patch("eoio.readers.copernicus_dem.masks.read_masks")
     def test_add_masks_calls_read_masks(self, mock_read_masks):
         ds = xr.Dataset()
@@ -66,7 +65,6 @@ class TestAddMasks(unittest.TestCase):
 
 
 class TestReadMasks(unittest.TestCase):
-
     @patch("eoio.readers.copernicus_dem.masks.lazy_rioxarray")
     def test_read_masks_returns_dataset_when_masks_empty(
         self,
@@ -241,6 +239,7 @@ class TestReadMasks(unittest.TestCase):
         rio_after_write.rio.clip.assert_called_once_with(["geom"])
 
         self.assertIn("water_body_mask", result.data_vars)
+
 
 if __name__ == "__main__":
     unittest.main()

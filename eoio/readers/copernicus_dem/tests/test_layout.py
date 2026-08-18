@@ -6,7 +6,6 @@ from eoio.readers.copernicus_dem.layout import CopernicusDEMLayout, get_layout
 
 
 class TestCopernicusDEMLayout(unittest.TestCase):
-
     def test_metadata_file_returns_xml(self):
         layout = CopernicusDEMLayout(
             dem=Path("dem.tif"),
@@ -33,7 +32,6 @@ class TestCopernicusDEMLayout(unittest.TestCase):
 
 
 class TestGetLayout(unittest.TestCase):
-
     def test_get_layout_with_all_files(self):
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

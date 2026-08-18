@@ -17,6 +17,7 @@ from typing import List, Optional
 import xarray as xr
 from eoio.readers.generic_netcdf.subset import GENERIC_NETCDFSubset
 
+
 def read_dataset(
     *,
     ds: xr.Dataset,
@@ -46,11 +47,15 @@ def read_dataset(
         ds = ds[include_vars]
 
     if subset is not None:
-        if hasattr(subset,"wavelength_indices") and subset.wavelength_indices is not None:
+        if hasattr(subset, "wavelength_indices") and subset.wavelength_indices is not None:
             ds = ds.isel(wavelength=subset.wavelength_indices)
-        if hasattr(subset,"datetime_indices") and subset.datetime_indices is not None:
+        if hasattr(subset, "datetime_indices") and subset.datetime_indices is not None:
             ds = ds.isel(datetime=subset.datetime_indices)
-        if hasattr(subset, "roi_subset") and hasattr(subset.roi_subset, "geometries") and subset.roi_subset.geometries is not None:
+        if (
+            hasattr(subset, "roi_subset")
+            and hasattr(subset.roi_subset, "geometries")
+            and subset.roi_subset.geometries is not None
+        ):
             ds = ds.rio.clip(subset.roi_subset.geometries)
 
     reorder = []

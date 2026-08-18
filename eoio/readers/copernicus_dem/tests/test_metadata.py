@@ -7,7 +7,6 @@ from eoio.readers.copernicus_dem.metadata import (
 
 
 class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
-
     def setUp(self):
         reader = Mock()
         reader.layout.metadata_file.return_value = "dummy.xml"
@@ -41,12 +40,9 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
         mock_root.return_value = Mock()
 
         self.assertEqual(
-            self.extractor.get_variable_product_metadata(
-                "unknown"
-            ),
+            self.extractor.get_variable_product_metadata("unknown"),
             {},
         )
-
 
     @patch.object(CopernicusDEMMetadataExtractor, "_root")
     @patch.object(CopernicusDEMMetadataExtractor, "_resolution_m")
@@ -67,13 +63,9 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
             ".//tsxx:numberOfColumns": "3600",
         }
 
-        mock_text.side_effect = (
-            lambda root, xpath: values[xpath]
-        )
+        mock_text.side_effect = lambda root, xpath: values[xpath]
 
-        md = self.extractor.get_variable_product_metadata(
-            "elevation"
-        )
+        md = self.extractor.get_variable_product_metadata("elevation")
 
         self.assertEqual(md["spatial_resolution"], 30)
         self.assertEqual(md["data_type"], "INT16")
@@ -81,17 +73,8 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
         self.assertEqual(md["rows"], 3600)
         self.assertEqual(md["columns"], 3600)
 
-    def test_get_variable_product_metadata_unknown(self):
-        self.assertEqual(
-            self.extractor.get_variable_product_metadata(
-                "unknown"
-            ),
-            {},
-        )
 
-    @patch(
-        "eoio.readers.copernicus_dem.metadata.normalize_footprint"
-    )
+    @patch("eoio.readers.copernicus_dem.metadata.normalize_footprint")
     @patch.object(CopernicusDEMMetadataExtractor, "_resolution_m")
     @patch.object(CopernicusDEMMetadataExtractor, "_root")
     @patch.object(CopernicusDEMMetadataExtractor, "_text")
@@ -123,9 +106,7 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
             ".//gmd:abstract/gco:CharacterString": "description",
         }
 
-        mock_text.side_effect = (
-            lambda root, xpath: values[xpath]
-        )
+        mock_text.side_effect = lambda root, xpath: values[xpath]
 
         md = self.extractor.get_basic_metadata()
 
@@ -188,9 +169,7 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
             ".//tsxx:mission": "TanDEM-X",
         }
 
-        mock_text.side_effect = (
-            lambda root, xpath: values[xpath]
-        )
+        mock_text.side_effect = lambda root, xpath: values[xpath]
 
         md = self.extractor.get_product_metadata()
 
@@ -215,6 +194,7 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
             md["hem"]["units"],
             "m",
         )
+
 
 if __name__ == "__main__":
     unittest.main()

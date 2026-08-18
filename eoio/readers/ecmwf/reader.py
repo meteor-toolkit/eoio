@@ -20,13 +20,14 @@ Functions
 from __future__ import annotations
 import xarray as xr
 import os.path
-from eoio.readers.base import ReaderConfig
 from eoio.readers.generic_netcdf.data_io import read_dataset
 from eoio.deps import lazy_rioxarray
+
 # from eoio.readers.hypernets.aux import maybe_add_aux
 from eoio.readers.generic_netcdf.metadata import GenericNetCDFMetadataExtractor
 from eoio.readers.generic_netcdf.reader import NetCDFReader
 from eoio.readers.generic_netcdf.subset import build_subset
+
 
 class ECMWFReader(NetCDFReader):
     """
@@ -76,7 +77,7 @@ class ECMWFReader(NetCDFReader):
 
         rio = lazy_rioxarray()
         image_crs = str(ds.rio.crs)
-        if image_crs is None or image_crs=="None":
+        if image_crs is None or image_crs == "None":
             ds = ds.rio.write_crs("EPSG:4326")
 
         # Build the subset

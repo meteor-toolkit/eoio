@@ -104,4 +104,3 @@ def read_masks(
             da = da.rio.clip(subset.geometries)
         ds[mask_name] = da
     return ds
-

@@ -6,7 +6,6 @@ from eoio.readers.copernicus_dem.reader import CopernicusDEMReader
 
 
 class TestCopernicusDEMReader(unittest.TestCase):
-
     @patch("eoio.readers.copernicus_dem.reader.apply_conventions")
     @patch("eoio.readers.copernicus_dem.reader.add_masks")
     @patch("eoio.readers.copernicus_dem.reader.append_data_vars")
@@ -150,6 +149,7 @@ class TestCopernicusDEMReader(unittest.TestCase):
         reader.open_dataset()
 
         mock_append_data_vars.assert_not_called()
-        
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,7 @@
 import xarray as xr
-from pathlib import Path
 from eoio.deps import lazy_rioxarray
 from eoio.utils.rasterio_utils import suggest_raster_chunks
+
 
 def append_data_vars(
     ds: xr.Dataset,

@@ -76,7 +76,7 @@ class ESAWorldCoverMetadataExtractor(BaseMetadataExtractor):
             "eoio:reader": "ESAWorldCover",
             "eoio:subset": repr(self.subset),
             "history": "",  # include if there is any history previous to eoio reading
-            "footprint": normalize_footprint(bounds, f'EPSG:{crs}'),
+            "footprint": normalize_footprint(bounds, f"EPSG:{crs}"),
         }
 
     def get_product_metadata(self) -> dict:
@@ -91,9 +91,8 @@ class ESAWorldCoverMetadataExtractor(BaseMetadataExtractor):
             "long_name": "Land cover classification",
             "standard_name": "",
             "flag_values": FLAG_VALUES,
-            "flag_meanings":FLAG_MEANINGS,
-            "flag_colors": FLAG_COLORS
-
+            "flag_meanings": FLAG_MEANINGS,
+            "flag_colors": FLAG_COLORS,
         }
 
     def _extract_year(self):
