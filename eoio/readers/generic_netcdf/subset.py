@@ -25,8 +25,11 @@ from dataclasses import dataclass
 from typing import Optional
 import numpy as np
 import xarray as xr
+from eoio.deps import lazy_rasterio
 
 from eoio.readers.subset.wavelength_subset import WavelengthSubsetResolver
+from eoio.readers.subset.datetime_subset import DatetimeSubsetResolver
+from eoio.readers.subset.roi_subset import ROISubsetResolver, ResolvedROISubset
 
 # This module is intentionally “mostly light”.
 # Heavy geo dependencies are imported only when ROI/subsetting is actually used.
@@ -52,8 +55,8 @@ class GENERIC_NETCDFSubset:
     """
 
     wavelength_indices: Optional[np.ndarray]
-
-    # series_indices: Optional[np.ndarray]
+    datetime_indices: Optional[np.ndarray]
+    roi_subset: Optional[ResolvedROISubset]
 
 
 def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
@@ -70,9 +73,40 @@ def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
         wav_subset = WavelengthSubsetResolver(ds["wavelength"], subset["wavelength"]).run()
         wavelength_indices = np.array(wav_subset.variable_indices) if len(wav_subset.variable_indices) > 0 else None
 
+
+    # --- Datetime constraint: filter series by datetime range ---
+    datetime_indices = None
+    if "datetime" in ds.keys() and "datetime" in subset and subset["datetime"] is not None:
+        # we might need this later for reading the netcdf version of the files
+        datetime_subset = DatetimeSubsetResolver(ds["datetime"], subset["datetime"]).run()
+        datetime_indices = datetime_subset.variable_indices
+
+    # ROI
+    roi_subset=None
+    if "datetime" in ds.keys() and subset["roi"] is not None:
+        roi = subset.get("roi")
+        if roi is None:
+            return None
+
+        roi_crs = subset.get("roi_crs")
+        try:
+            rio = lazy_rasterio()
+            image_crs = str(ds.rio.crs)
+
+        except Exception:
+            raise ValueError("Cannot resolve ROI subset: raster CRS not available.")
+        
+        roi_subset = ROISubsetResolver(
+            roi=roi,
+            roi_crs_epsg=roi_crs,
+            image_crs_epsg=image_crs,
+            image_bounds=None,
+        ).run()
+
     return GENERIC_NETCDFSubset(
-        # series_indices=indices,
         wavelength_indices=wavelength_indices,
+        datetime_indices=datetime_indices,
+        roi_subset=roi_subset
     )
 
 

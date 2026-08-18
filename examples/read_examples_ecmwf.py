@@ -52,6 +52,10 @@ cams_ds = read(
     CAMS_PATH,
     vars_sel={"meas": "all"},
     read_params={"metadata_level": "all", "save_extracted": False},
+    subset={
+                "roi": ((15.0,-23.25), 100),
+                "roi_crs": 4326,
+           },
 )
 
 print("CAMS dataset:", cams_ds)

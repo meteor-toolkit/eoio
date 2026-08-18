@@ -168,7 +168,21 @@ def read_dataset(*, ds: xr.Dataset, include_vars: List[str], subset: RADCALNETSu
 
     ds = ds[include_vars]
 
-    id_time, id_wavelength = subset.series_indices, subset.wavelength_indices
-    ds = ds.isel(time=id_time, wavelength=id_wavelength)
+    # series_indices/wavelength_indices are None when no subset criteria was
+    # given for that dimension (e.g. build_subset() leaves series_indices
+    # None when time_of_day_utc/time_of_day_local/angle/datetime are all
+    # None -- the default since RadCalNetReader stopped hardcoding a
+    # universal time_of_day_utc window). Passing None to isel() as an
+    # indexer is not the same as omitting it -- xarray tries to use it as an
+    # actual index and raises ("invalid indexer array, does not have
+    # integer dtype") -- so only pass the dimensions that actually have a
+    # resolved index array.
+    isel_kwargs = {}
+    if subset.series_indices is not None:
+        isel_kwargs["time"] = subset.series_indices
+    if subset.wavelength_indices is not None:
+        isel_kwargs["wavelength"] = subset.wavelength_indices
+    if isel_kwargs:
+        ds = ds.isel(**isel_kwargs)
 
     return ds

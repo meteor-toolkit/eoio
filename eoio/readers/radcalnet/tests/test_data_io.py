@@ -86,6 +86,40 @@ class testReadDataset(unittest.TestCase):
         assert result["var1"].shape == (1, 2)
         assert np.all(result["var1"].values == np.array([1, 2]))
 
+    def test_read_dataset_with_no_subset_criteria_returns_all_rows(self):
+        """Regression test: series_indices/wavelength_indices are None when
+        no subset criteria applies to that dimension (e.g. build_subset()
+        leaves series_indices None when time_of_day_utc/time_of_day_local/
+        angle/datetime are all None -- the default since RadCalNetReader
+        stopped hardcoding a universal time_of_day_utc window). Passing None
+        straight through to isel() as an indexer used to raise ("invalid
+        indexer array, does not have integer dtype") instead of being
+        treated as "don't subset this dimension"."""
+        ds = xr.Dataset(
+            {
+                "var1": (["time", "wavelength"], np.arange(6).reshape(2, 3)),
+            }
+        )
+
+        include_vars = ["var1"]
+        subset = DummySubset(series_indices=None, wavelength_indices=None)
+        result = read_dataset(ds=ds, include_vars=include_vars, subset=subset)
+        assert result["var1"].shape == (2, 3)
+        assert np.all(result["var1"].values == ds["var1"].values)
+
+    def test_read_dataset_with_only_wavelength_subset_leaves_time_unsubset(self):
+        ds = xr.Dataset(
+            {
+                "var1": (["time", "wavelength"], np.arange(6).reshape(2, 3)),
+            }
+        )
+
+        include_vars = ["var1"]
+        subset = DummySubset(series_indices=None, wavelength_indices=[1, 2])
+        result = read_dataset(ds=ds, include_vars=include_vars, subset=subset)
+        assert result["var1"].shape == (2, 2)
+        assert np.all(result["var1"].values == np.array([[1, 2], [4, 5]]))
+
 
 class testReadFile(unittest.TestCase):
     """Regression tests for read_file()'s Site/Lat/Lon/Alt attrs.

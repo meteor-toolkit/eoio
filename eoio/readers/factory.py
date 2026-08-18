@@ -45,8 +45,10 @@ class ReaderFactory:
         CAMS_pattern = re.compile(r"CAMS*.*")
         FLOX_pattern = re.compile(r".*.FLOX*.*")
         nc_pattern = re.compile(r".*.nc")
+        esa_world_cover_pattern = re.compile(r"ESA_WorldCover.*.tif")
         modis_terra_pattern = re.compile(r"MOD.*")
         modis_aqua_pattern = re.compile(r"MOD.*")
+        copernicus_dem_pattern = re.compile(r".*Copernicus.*DEM.*")
         # > Check if input product_path matches any known product regular expressions
         #   return parsingFactory as appropriate
         if re.search(S2MSIL1C_pattern, path):
@@ -129,6 +131,15 @@ class ReaderFactory:
 
             return ECMWFReader
 
+        elif re.search(copernicus_dem_pattern, path):
+            from eoio.readers.copernicus_dem.reader import CopernicusDEMReader
+            
+            return CopernicusDEMReader
+        
+        elif re.search(esa_world_cover_pattern, path):
+            from eoio.readers.ESAWorldCover.reader import ESAWorldCoverReader
+            return ESAWorldCoverReader
+        
         elif re.search(FLOX_pattern, path) or re.search(nc_pattern, path):
             from eoio.readers.generic_netcdf.reader import NetCDFReader
 

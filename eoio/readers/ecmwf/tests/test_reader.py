@@ -50,7 +50,9 @@ class TestECMWFReader(unittest.TestCase):
         self.assertIs(result, ds_after_rename)
         mock_read_dataset.assert_called_once()
         read_call_kwargs = mock_read_dataset.call_args.kwargs
-        self.assertIsNone(read_call_kwargs["subset"])
+        self.assertIsNone(read_call_kwargs["subset"].wavelength_indices)
+        self.assertIsNone(read_call_kwargs["subset"].datetime_indices)
+        self.assertIsNone(read_call_kwargs["subset"].roi_subset)
         self.assertEqual(read_call_kwargs["include_vars"], None)
         self.assertNotIn("valid_time", read_call_kwargs["ds"].variables)
         self.assertIn("datetime", read_call_kwargs["ds"].variables)
