@@ -14,15 +14,10 @@ from eoio.readers.ESAWorldCover.metadata import (
 
 
 class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
-
     def setUp(self):
         self.reader = MagicMock()
-        self.reader.path = Path(
-            "ESA_WorldCover_10m_2021_v200_Map.tif"
-        )
-        self.reader.config = SimpleNamespace(
-            subset={"roi": ((0, 0), 100)}
-        )
+        self.reader.path = Path("ESA_WorldCover_10m_2021_v200_Map.tif")
+        self.reader.config = SimpleNamespace(subset={"roi": ((0, 0), 100)})
 
         self.ds = xr.Dataset(
             {
@@ -48,16 +43,13 @@ class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
         self.assertEqual(md["product_date"], "2021")
         self.assertEqual(md["product_bounds"], "")
 
-
     def test_variable_metadata(self):
         extractor = ESAWorldCoverMetadataExtractor(
             self.reader,
             self.ds,
         )
 
-        md = extractor.get_variable_basic_metadata(
-            "landcover_map"
-        )
+        md = extractor.get_variable_basic_metadata("landcover_map")
 
         self.assertEqual(md["units"], "1")
         self.assertEqual(
@@ -89,9 +81,7 @@ class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
         )
 
     def test_extract_year_no_year_found(self):
-        self.reader.path = Path(
-            "ESA_WorldCover_Map.tif"
-        )
+        self.reader.path = Path("ESA_WorldCover_Map.tif")
 
         extractor = ESAWorldCoverMetadataExtractor(
             self.reader,
@@ -114,9 +104,7 @@ class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
             extractor.get_basic_metadata(),
         )
 
-    @patch(
-        "eoio.readers.ESAWorldCover.metadata.normalize_footprint"
-    )
+    @patch("eoio.readers.ESAWorldCover.metadata.normalize_footprint")
     def test_basic_metadata_without_rio(self, mock_normalize):
         mock_normalize.return_value = {}
 
@@ -135,7 +123,6 @@ class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
 
 
 class TestWorldCoverConstants(unittest.TestCase):
-
     def test_flag_metadata_lengths_match(self):
         self.assertEqual(
             len(FLAG_VALUES),

@@ -1,5 +1,4 @@
 from __future__ import annotations
-from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from eoio.readers.metadata import BaseMetadataExtractor
@@ -14,7 +13,6 @@ NS = {
 
 
 class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
-
     def __init__(self, reader):
         super().__init__(reader)
         self.metadata_filepath = reader.layout.metadata_file()
@@ -28,7 +26,7 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
         if element is not None and element.text:
             return element.text.strip()
         return None
-    
+
     def _resolution_m(self):
 
         variant = self._text(
@@ -37,7 +35,7 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
         )
 
         return 30 if variant == "10" else 90
-    
+
     def get_basic_metadata(self):
 
         root = self._root()
@@ -110,6 +108,7 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
                 crs_input=4326,
             ),
         }
+
     def get_product_metadata(self):
 
         root = self._root()
@@ -215,7 +214,7 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
         )
 
         return md
-    
+
     def get_variable_basic_metadata(self, var):
 
         if var.lower() != "elevation":
@@ -227,11 +226,11 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
             "units": "m",
             "measurand": "elevation",
         }
+
     def get_variable_product_metadata(self, var):
         if var.lower() != "elevation":
             return {}
         root = self._root()
-
 
         resolution = self._resolution_m()
 
@@ -270,6 +269,7 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
                 "hem",
             ],
         }
+
     def get_aux_metadata(self):
 
         return {

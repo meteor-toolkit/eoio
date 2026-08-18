@@ -73,7 +73,6 @@ def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
         wav_subset = WavelengthSubsetResolver(ds["wavelength"], subset["wavelength"]).run()
         wavelength_indices = np.array(wav_subset.variable_indices) if len(wav_subset.variable_indices) > 0 else None
 
-
     # --- Datetime constraint: filter series by datetime range ---
     datetime_indices = None
     if "datetime" in ds.keys() and "datetime" in subset and subset["datetime"] is not None:
@@ -82,7 +81,7 @@ def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
         datetime_indices = datetime_subset.variable_indices
 
     # ROI
-    roi_subset=None
+    roi_subset = None
     if "datetime" in ds.keys() and subset["roi"] is not None:
         roi = subset.get("roi")
         if roi is None:
@@ -95,7 +94,7 @@ def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
 
         except Exception:
             raise ValueError("Cannot resolve ROI subset: raster CRS not available.")
-        
+
         roi_subset = ROISubsetResolver(
             roi=roi,
             roi_crs_epsg=roi_crs,
@@ -104,9 +103,7 @@ def build_subset(ds: xr.Dataset, subset: dict) -> GENERIC_NETCDFSubset:
         ).run()
 
     return GENERIC_NETCDFSubset(
-        wavelength_indices=wavelength_indices,
-        datetime_indices=datetime_indices,
-        roi_subset=roi_subset
+        wavelength_indices=wavelength_indices, datetime_indices=datetime_indices, roi_subset=roi_subset
     )
 
 

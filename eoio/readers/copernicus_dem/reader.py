@@ -1,4 +1,5 @@
 """eoio.readers.copernicus_dem.reader - Copernicus DEM 30m and 90m data reader implementation."""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -15,7 +16,7 @@ from eoio.readers.copernicus_dem.layout import get_layout
 from eoio.readers.copernicus_dem.data_io import append_data_vars
 from eoio.readers.copernicus_dem.metadata import CopernicusDEMMetadataExtractor
 from eoio.readers.copernicus_dem.conventions import apply_conventions
-from  eoio.readers.copernicus_dem.masks import add_masks
+from eoio.readers.copernicus_dem.masks import add_masks
 
 AUX_OPTIONS = []
 
@@ -27,6 +28,7 @@ MASK_OPTIONS = [
 ]
 
 __all__ = ["CopernicusDEMReader"]
+
 
 class CopernicusDEMReader(BaseRasterReader):
     """
@@ -76,13 +78,9 @@ class CopernicusDEMReader(BaseRasterReader):
 
         self.mtd = CopernicusDEMMetadataExtractor(self)
 
-        resolution_variant = self.mtd.get_product_metadata().get(
-    "resolution_variant"
-)
+        resolution_variant = self.mtd.get_product_metadata().get("resolution_variant")
 
-        self.meas_var_res = {
-        "elevation": 30 if resolution_variant == "10" else 90
-}
+        self.meas_var_res = {"elevation": 30 if resolution_variant == "10" else 90}
 
         super().__init__(path, vars_sel, subset, read_params)
 
@@ -114,9 +112,7 @@ class CopernicusDEMReader(BaseRasterReader):
             )
 
         if image_crs is None:
-            raise ValueError(
-                "Cannot resolve ROI subset: product CRS not available."
-            )
+            raise ValueError("Cannot resolve ROI subset: product CRS not available.")
 
         return ROISubsetResolver(
             roi=roi,
@@ -179,6 +175,7 @@ class CopernicusDEMReader(BaseRasterReader):
         Copernicus DEM products are GeoTIFF-based.
         """
         return ""
-    
+
+
 if __name__ == "__main__":
     pass

@@ -60,7 +60,7 @@ class TestESAWorldCoverReader(unittest.TestCase):
     ):
         mock_open_dataset.return_value = xr.Dataset()
 
-        ds = xr.Dataset()
+        _ = xr.Dataset()
 
 
 if __name__ == "__main__":

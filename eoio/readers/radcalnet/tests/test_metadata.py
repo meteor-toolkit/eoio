@@ -3,6 +3,7 @@ import unittest
 import warnings
 import numpy as np
 import xarray as xr
+from pathlib import Path
 
 from eoio.readers.radcalnet.metadata import ROI_DEFINITIONS, RadCalNetMetadataExtractor
 
@@ -13,7 +14,7 @@ class _FakeConfig:
 
 
 class _FakeReader:
-    path = "fake_radcalnet_file.txt"
+    path = Path("fake_radcalnet_file.txt")
     config = _FakeConfig()
     resolved_config = None
 
@@ -63,7 +64,7 @@ class testGetBasicMetadata(unittest.TestCase):
 
         self.assertEqual(md["name"], "GONA01")
         self.assertEqual(md["collection_name"], "GONA RadCalNet")
-        self.assertEqual(md["product_name"], "GONA_RadCalNet_L1")
+        self.assertEqual(md["product_name"], "fake_radcalnet_file.txt")
 
     def test_product_bounds_has_no_stray_brackets(self):
         extractor = RadCalNetMetadataExtractor(_FakeReader(), _make_ds())

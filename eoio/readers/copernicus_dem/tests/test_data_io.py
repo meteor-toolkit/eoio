@@ -7,7 +7,6 @@ from eoio.readers.copernicus_dem.data_io import append_data_vars
 
 
 class TestAppendDataVars(unittest.TestCase):
-
     @patch("eoio.readers.copernicus_dem.data_io.lazy_rioxarray")
     def test_append_data_vars(self, mock_lazy_rioxarray):
 
@@ -59,9 +58,7 @@ class TestAppendDataVars(unittest.TestCase):
             use_chunks=True,
         )
 
-        mock_suggest_chunks.assert_called_once_with(
-            "/tmp/dem.tif"
-        )
+        mock_suggest_chunks.assert_called_once_with("/tmp/dem.tif")
 
         rxr.open_rasterio.assert_called_once_with(
             "/tmp/dem.tif",
