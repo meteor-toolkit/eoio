@@ -20,6 +20,7 @@ Functions
 from __future__ import annotations
 import xarray as xr
 import os.path
+from eoio.readers.base import ReaderConfig
 from eoio.readers.ecmwf.subset import build_subset
 from eoio.readers.generic_netcdf.data_io import read_dataset
 
@@ -34,7 +35,7 @@ class ECMWFReader(NetCDFReader):
     """
 
     default_vars_sel = {
-        "meas": None,  # e.g. []
+        "meas": "all",  # e.g. []
         "mask": None,  # e.g. ["cloud"]
         "aux": None,  # e.g. ["viewing_zenith_angle"]
     }
@@ -77,6 +78,15 @@ class ECMWFReader(NetCDFReader):
         # open data
         ds = self.ds_src.copy()
         ds = ds.rename({"valid_time": "datetime"})
+        self.meas_def = {
+            "all": list(ds.variables),
+        }
+
+        self.resolved_config = ReaderConfig(
+            vars_sel=self.resolved_vars_sel(),
+            subset=self.resolve_subset(self.config.subset),
+            read_params=self.config.read_params,
+        )
 
         # Build the subset
         build_subset(
@@ -106,6 +116,10 @@ class ECMWFReader(NetCDFReader):
             ds = meta_ex.clear_metadata(ds)
             if mtd_level in ("all", "basic"):
                 ds = meta_ex.attach_metadata(ds, level=mtd_level)
+            if "datetime" in ds.variables:
+                ds["datetime"].attrs.pop(
+                    "units", None
+                )  # remove units attribute because units get automaticaly set for datetime variables when writing to netcdf
             return ds
 
 

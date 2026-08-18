@@ -12,7 +12,7 @@ from eoio.interface import read, product_options  # (
 #     write,
 # )
 
-# __all__ = ["read", "write" "show_versions"]
+__all__ = ["read", "write"]  # , "show_versions"]
 
 from importlib.metadata import PackageNotFoundError, version
 

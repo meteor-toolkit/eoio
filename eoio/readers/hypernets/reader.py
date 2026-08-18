@@ -235,7 +235,7 @@ class HYPERNETSL1IrrReader(HYPERNETSReader):
             "n_valid_scans",
             "n_valid_scans_SWIR",
             "bandwidth",
-            "std_radiance",
+            "std_irradiance",
             "acceleration_x_mean",
             "acceleration_y_mean",
             "acceleration_z_mean",
@@ -261,6 +261,17 @@ class HYPERNETSL1IrrReader(HYPERNETSReader):
         "err_corr_systematic_corr_rad_irr_irradiance",
         "err_corr_systematic_indep_irradiance",
     ]
+
+    default_subset = {
+        "mask": None,
+        "wavelength": {"min": 380, "max": 1700},
+        "angle": {
+            "sza": {"min": 0, "max": 90},
+            "saa": {"min": 0, "max": 360},
+        },
+        "datetime": None,
+        "time_of_day_utc": None,
+    }
 
 
 class HYPERNETSL2RefReader(HYPERNETSReader):
