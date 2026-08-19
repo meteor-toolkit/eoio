@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Any
+import warnings
 from eoio.deps import lazy_cfgrib
 from eoio.readers.sentinel2.layout import S2Layout
 from eoio.readers.sentinel2.metadata.var_names import (
@@ -9,6 +10,7 @@ from eoio.readers.sentinel2.metadata.var_names import (
     AUX_ECMWF_VARS_OLD,
     AUX_CAMS_VARS,
 )
+from eoio.utils.aux_read import warn_on_aux_failure
 import xarray as xr
 import os
 from contextlib import contextmanager
@@ -34,11 +36,12 @@ def add_meteo(*, ds: xr.Dataset, var_names: list[str], layout: S2Layout, config:
         Reader or processor configuration object. Currently unused, but
         included for API consistency and future extensibility.
     :returns:
-        A new xarray Dataset containing the original data and the requested
-        auxiliary variables.
-    :raises KeyError:
-        If one or more requested variables are not present in the available
-        auxiliary GRIB products.
+        A new xarray Dataset containing the original data and any of the requested
+        auxiliary variables that could be read. If the ECMWF or CAMS GRIB product
+        fails to open (missing/corrupt file, unsupported GRIB message, etc.), that
+        source is skipped with a warning rather than raising -- variables that
+        depend on it are simply left out of the returned dataset, but variables
+        from the other source (and the original ``ds``) are unaffected.
     """
 
     lazy_cfgrib()
@@ -74,25 +77,36 @@ def add_meteo(*, ds: xr.Dataset, var_names: list[str], layout: S2Layout, config:
                 os.close(old_stderr)
 
     if need_ecmwf:
-        ecmwf_path = layout.aux_path("AUX_ECMWFT", granule=granule)
-        with _suppress_stderr_fd():
-            parts.append(xr.open_dataset(ecmwf_path, engine="cfgrib"))
+        with warn_on_aux_failure("Sentinel-2 ECMWF meteo"):
+            ecmwf_path = layout.aux_path("AUX_ECMWFT", granule=granule)
+            with _suppress_stderr_fd():
+                parts.append(xr.open_dataset(ecmwf_path, engine="cfgrib"))
 
     if need_cams:
-        cams_path = layout.aux_path("AUX_CAMSFO", granule=granule)
-        with _suppress_stderr_fd():
-            parts.append(xr.open_dataset(cams_path, engine="cfgrib"))
+        with warn_on_aux_failure("Sentinel-2 CAMS meteo"):
+            cams_path = layout.aux_path("AUX_CAMSFO", granule=granule)
+            with _suppress_stderr_fd():
+                parts.append(xr.open_dataset(cams_path, engine="cfgrib"))
+
+    if not parts:
+        return ds
 
     aux_ds = xr.merge(parts, compat="no_conflicts", combine_attrs="drop_conflicts").rename(
         {"latitude": "latitude_aux", "longitude": "longitude_aux"}
     )
 
-    # Make missing vars an explicit error (or skip if you prefer)
+    # A source that opened successfully might still not contain every requested var
+    # (e.g. a genuinely unsupported var name); warn and skip those rather than
+    # raising, consistent with a failed-open source above.
+    available = [v for v in var_names if v in aux_ds]
     missing = [v for v in var_names if v not in aux_ds]
     if missing:
-        raise KeyError(f"Requested aux vars not found in AUX GRIB(s): {missing}. Available: {list(aux_ds.data_vars)}")
+        warnings.warn(
+            f"Requested aux vars not found in available AUX GRIB(s), skipping them: {missing}. "
+            f"Available: {list(aux_ds.data_vars)}"
+        )
 
-    return ds.assign({v: aux_ds[v] for v in var_names})
+    return ds.assign({v: aux_ds[v] for v in available})
 
 
 if __name__ == "__main__":

@@ -29,6 +29,11 @@ The read function uses separate parameters for variable selection, subsetting, a
 * ``subset`` - a dictionary containing spatial subsetting parameters such as region of interest (ROI) and its coordinate reference system
 * ``read_params`` - a dictionary containing reading parameters such as chunking options
 
+Auxiliary data (e.g. Sentinel-2's ECMWF/CAMS meteo, angles, atmospheric inputs) is read on a
+best-effort basis: if one auxiliary source is unavailable or fails to read (a missing or corrupt
+file, for example), a warning is raised and that source's variables are simply left out of the
+returned dataset rather than aborting the whole read -- measurement variables and any other
+auxiliary sources that did read successfully are unaffected.
 
 For a Sentinel-2 L1C product a ``vars_sel`` and ``subset`` dictionary may look like::
 
