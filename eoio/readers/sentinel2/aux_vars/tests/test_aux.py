@@ -177,6 +177,38 @@ class TestAuxData(unittest.TestCase):
         mock_add_meteo.assert_not_called()
         self.assertIs(out, self.ds)
 
+    @patch.object(aux_data, "add_meteo")
+    @patch.object(aux_data, "add_angles")
+    def test_add_aux_angles_failure_warns_but_meteo_still_runs(self, mock_add_angles, mock_add_meteo):
+        """A failure reading angles (e.g. a missing/corrupt MTD file) shouldn't stop
+        meteo aux vars from being read -- the two are independent aux categories."""
+        with (
+            patch.object(aux_data, "ANGLE_VARS", ["sun_zenith"]),
+            patch.object(aux_data, "AUX_ECMWF_VARS_NEW", ["tcwv"]),
+            patch.object(aux_data, "AUX_CAMS_VARS", ["tco3"]),
+            patch.object(aux_data, "AUX_ECMWF_VARS_OLD", ["msl"]),
+        ):
+            config = SimpleNamespace(
+                vars_sel={"aux": ["sun_zenith", "tcwv"]},
+                read_params={"ave_va_det": True},
+            )
+
+            mock_add_angles.side_effect = RuntimeError("corrupt MTD file")
+            ds_after_meteo = xr.Dataset(attrs={"stage": "after_meteo"})
+            mock_add_meteo.return_value = ds_after_meteo
+
+            with self.assertWarns(UserWarning) as ctx:
+                out = aux_data.add_aux(ds=self.ds, layout=self.layout, config=config, mtd=self.mtd)
+
+            self.assertIn("angles", str(ctx.warning))
+
+            mock_add_angles.assert_called_once()
+            mock_add_meteo.assert_called_once()
+            # meteo received the original ds, since add_angles never returned successfully
+            _, met_kwargs = mock_add_meteo.call_args
+            self.assertIs(met_kwargs["ds"], self.ds)
+            self.assertIs(out, ds_after_meteo)
+
 
 if __name__ == "__main__":
     unittest.main()

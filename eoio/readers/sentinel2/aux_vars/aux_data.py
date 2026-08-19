@@ -13,6 +13,7 @@ from eoio.readers.sentinel2.metadata.var_names import (
     AUX_ECMWF_VARS_NEW,
     AUX_ECMWF_VARS_OLD,
 )
+from eoio.utils.aux_read import warn_on_aux_failure
 
 
 def get_available_aux(layout: S2Layout) -> list[str]:
@@ -44,6 +45,11 @@ def add_aux(
     - reads full aux fields (no spatial subsetting yet)
     - merges into dataset
     - stores aux metadata under ds.attrs["product_metadata"]
+
+    Angle and meteo aux data are read independently: if one fails (e.g. a missing or
+    corrupt CAMS/ECMWF GRIB file), a warning is raised and that aux data is left out
+    of the returned dataset, but the rest of the read (bands, the other aux category)
+    is unaffected.
     """
 
     aux_names = config.vars_sel["aux"]
@@ -53,16 +59,18 @@ def add_aux(
     remaining_vars = [x for x in aux_names if x not in angle_names]
 
     if angle_names:
-        ds = add_angles(
-            ds=ds,
-            angle_names=angle_names,
-            mtd=mtd,
-            ave_det=config.read_params["ave_va_det"],
-        )
+        with warn_on_aux_failure("Sentinel-2 angles"):
+            ds = add_angles(
+                ds=ds,
+                angle_names=angle_names,
+                mtd=mtd,
+                ave_det=config.read_params["ave_va_det"],
+            )
 
     meteo_names = [x for x in AUX_ECMWF_VARS_NEW + AUX_CAMS_VARS + AUX_ECMWF_VARS_OLD if x in remaining_vars]
     if meteo_names:
-        ds = add_meteo(ds=ds, var_names=meteo_names, layout=layout, config=config)
+        with warn_on_aux_failure("Sentinel-2 meteo"):
+            ds = add_meteo(ds=ds, var_names=meteo_names, layout=layout, config=config)
 
     return ds
 

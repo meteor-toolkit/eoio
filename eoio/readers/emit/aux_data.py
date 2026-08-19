@@ -5,6 +5,7 @@ from typing import Any, Optional
 import xarray as xr
 
 from eoio.readers.emit.angles import add_angles
+from eoio.utils.aux_read import warn_on_aux_failure
 
 MISC_AUX_VARS = [
     "Slope",
@@ -65,15 +66,18 @@ def add_aux(
     obs_ds = obs_ds.assign_coords({"bands": band_labels})
 
     if angle_names:
-        ds = add_angles(ds=ds, obs_ds=obs_ds, angle_names=angle_names)
+        with warn_on_aux_failure("EMIT angles"):
+            ds = add_angles(ds=ds, obs_ds=obs_ds, angle_names=angle_names)
 
     if misc_aux:
-        ds = add_misc(ds=ds, obs_ds=obs_ds, misc_aux=misc_aux)
+        with warn_on_aux_failure("EMIT misc"):
+            ds = add_misc(ds=ds, obs_ds=obs_ds, misc_aux=misc_aux)
 
     if "elev" in aux_names:
-        elev_ds = xr.open_dataset(obs_path, group="location")
-        elev_ds = elev_ds.sel(downtrack=down_idx, crosstrack=cross_idx)
-        ds = add_elev(ds=ds, elev_ds=elev_ds)
+        with warn_on_aux_failure("EMIT elevation"):
+            elev_ds = xr.open_dataset(obs_path, group="location")
+            elev_ds = elev_ds.sel(downtrack=down_idx, crosstrack=cross_idx)
+            ds = add_elev(ds=ds, elev_ds=elev_ds)
 
     return ds
 

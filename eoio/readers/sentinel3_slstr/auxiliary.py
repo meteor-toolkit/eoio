@@ -8,6 +8,7 @@ from eoio.readers.base import ReaderConfig
 from eoio.readers.sentinel3_slstr.layout import S3SLSTRLayout
 from eoio.readers.subset.roi_subset import ResolvedROISubset
 from eoio.utils.rasterio_utils import suggest_raster_chunks, _first_path
+from eoio.utils.aux_read import warn_on_aux_failure
 from eoio.readers.sentinel3_slstr.utils import GRID_RES_MAP
 
 
@@ -44,79 +45,86 @@ def add_aux(
     lazy_rioxarray()
 
     if "cartesian" in aux_names:
-        ds = read_cartesian_geometry(
-            ds=ds,
-            layout=layout,
-            grids=grids,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR cartesian geometry"):
+            ds = read_cartesian_geometry(
+                ds=ds,
+                layout=layout,
+                grids=grids,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     if "indices" in aux_names:
-        ds = read_indices(
-            ds=ds,
-            layout=layout,
-            grids=grids,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR indices"):
+            ds = read_indices(
+                ds=ds,
+                layout=layout,
+                grids=grids,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     if "met" in aux_names:
-        ds = read_met(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR met"):
+            ds = read_met(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     if "time" in aux_names:
-        ds = read_time(
-            ds=ds,
-            layout=layout,
-            grids=grids,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR time"):
+            ds = read_time(
+                ds=ds,
+                layout=layout,
+                grids=grids,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+            )
 
     if "viscal" in aux_names:
-        ds = read_viscal(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR viscal"):
+            ds = read_viscal(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+            )
 
     if "observation_geometry" in aux_names:
-        ds = read_observation_geometry(
-            ds=ds,
-            layout=layout,
-            grids=grids,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-            use_chunks=config.read_params.get("use_chunks", False),
-            chunks=config.read_params.get("chunks", None),
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR observation geometry"):
+            ds = read_observation_geometry(
+                ds=ds,
+                layout=layout,
+                grids=grids,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+                use_chunks=config.read_params.get("use_chunks", False),
+                chunks=config.read_params.get("chunks", None),
+            )
 
     if "orphan" in aux_names:
-        ds = read_orphan(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            clip_boxes=clip_boxes,
-            config=config,
-        )
+        with warn_on_aux_failure("Sentinel-3 SLSTR orphan"):
+            ds = read_orphan(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                clip_boxes=clip_boxes,
+                config=config,
+            )
 
     return ds
 

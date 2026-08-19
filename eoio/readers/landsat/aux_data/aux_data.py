@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from eoio.readers.landsat.reader import LandsatReader
 
 from eoio.readers.landsat.aux_data.angles import read_angles_into_dataset
+from eoio.utils.aux_read import warn_on_aux_failure
 
 
 class LSAuxData:
@@ -44,15 +45,16 @@ class LSAuxData:
         # Add angle variables first
         angle_vars = [var for var in requested_aux if var in self.layout.get_angle_files()]
         if angle_vars:
-            ds = read_angles_into_dataset(
-                ds=ds,
-                layout=self.layout,
-                angle_vars=angle_vars,
-                subset=roi_subset,
-                mtd=self.reader.mtd,
-                use_chunks=self.reader.resolved_config.read_params["use_chunks"],
-                chunks=self.reader.resolved_config.read_params["chunks"],
-            )
+            with warn_on_aux_failure("Landsat angles"):
+                ds = read_angles_into_dataset(
+                    ds=ds,
+                    layout=self.layout,
+                    angle_vars=angle_vars,
+                    subset=roi_subset,
+                    mtd=self.reader.mtd,
+                    use_chunks=self.reader.resolved_config.read_params["use_chunks"],
+                    chunks=self.reader.resolved_config.read_params["chunks"],
+                )
 
         # # Read remaining aux vars (e.g. QA bands) from files - only exist in L2 products
         # aux_vars = [

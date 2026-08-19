@@ -6,7 +6,7 @@ import glob
 import os
 import socket
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 from pathlib import Path
 
 import xarray as xr
@@ -202,7 +202,7 @@ class TestAddMeteo(unittest.TestCase):
     @patch("eoio.readers.sentinel2.aux_vars.meteo.lazy_cfgrib")
     @patch("eoio.readers.sentinel2.aux_vars.meteo.xr.merge")
     @patch("eoio.readers.sentinel2.aux_vars.meteo.xr.open_dataset")
-    def test_missing_requested_var_raises_keyerror(self, open_dataset_mock, merge_mock, lazy_cfgrib_mock):
+    def test_missing_requested_var_warns_and_is_skipped(self, open_dataset_mock, merge_mock, lazy_cfgrib_mock):
         from eoio.readers.sentinel2.metadata.var_names import AUX_ECMWF_VARS_NEW
 
         self.layout.proc_version = (5, 0)
@@ -221,15 +221,62 @@ class TestAddMeteo(unittest.TestCase):
         open_dataset_mock.return_value = xr.Dataset()
 
         requested = [AUX_ECMWF_VARS_NEW[0]]  # not present in aux
-        with self.assertRaises(KeyError) as ctx:
-            add_meteo(
+        with self.assertWarns(UserWarning) as ctx:
+            out = add_meteo(
                 ds=self.base_ds,
                 var_names=requested,
                 layout=self.layout,
                 config=self.config,
             )
 
-        self.assertIn("Requested aux vars not found", str(ctx.exception))
+        self.assertIn("Requested aux vars not found", str(ctx.warning))
+        self.assertNotIn(requested[0], out.data_vars)
+        # Original data is untouched even though the requested var was skipped.
+        self.assertIn("B02", out.data_vars)
+
+    @patch("eoio.readers.sentinel2.aux_vars.meteo.lazy_cfgrib")
+    @patch("eoio.readers.sentinel2.aux_vars.meteo.xr.merge")
+    @patch("eoio.readers.sentinel2.aux_vars.meteo.xr.open_dataset")
+    def test_cams_open_failure_warns_and_keeps_ecmwf_vars(self, open_dataset_mock, merge_mock, lazy_cfgrib_mock):
+        """A broken/corrupt CAMS GRIB shouldn't take ECMWF vars down with it (the
+        originally reported bug: an aux read failure aborted the whole product read)."""
+        from eoio.readers.sentinel2.metadata.var_names import AUX_ECMWF_VARS_NEW, AUX_CAMS_VARS
+
+        self.layout.proc_version = (5, 0)
+
+        ecmwf_var = AUX_ECMWF_VARS_NEW[0]
+        cams_var = AUX_CAMS_VARS[0]
+        requested = [ecmwf_var, cams_var]
+
+        # ECMWF open succeeds, CAMS open raises (e.g. a corrupt/unsupported GRIB message).
+        def open_dataset_side_effect(path, engine=None):
+            if "AUX_CAMSFO" in path:
+                raise EOFError("bad GRIB message")
+            return xr.Dataset()
+
+        open_dataset_mock.side_effect = open_dataset_side_effect
+
+        aux = xr.Dataset(
+            data_vars={
+                ecmwf_var: (
+                    ("t", "latitude", "longitude"),
+                    np.ones((1, 2, 3), dtype=np.float32),
+                ),
+            },
+            coords={"t": [0], "latitude": [50.0, 51.0], "longitude": [0.0, 1.0, 2.0]},
+        )
+        merge_mock.return_value = aux
+
+        with self.assertWarns(UserWarning) as ctx:
+            out = add_meteo(ds=self.base_ds, var_names=requested, layout=self.layout, config=self.config)
+
+        self.assertIn("CAMS", str(ctx.warning))
+
+        # ECMWF var made it through; CAMS var (and its source) didn't.
+        self.assertIn(ecmwf_var, out.data_vars)
+        self.assertNotIn(cams_var, out.data_vars)
+        # Only the successfully-opened ECMWF part was merged.
+        merge_mock.assert_called_once_with([ANY], compat="no_conflicts", combine_attrs="drop_conflicts")
 
     @patch("eoio.readers.sentinel2.aux_vars.meteo.lazy_cfgrib")
     @patch("eoio.readers.sentinel2.aux_vars.meteo.xr.merge")

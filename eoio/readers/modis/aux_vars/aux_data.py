@@ -16,6 +16,7 @@ from eoio.readers.modis.metadata.var_names import (
     ATMOS_VARS,
 )
 from eoio.readers.subset.roi_subset import ResolvedROISubset
+from eoio.utils.aux_read import warn_on_aux_failure
 from eoio.utils.rasterio_utils import suggest_raster_chunks
 
 
@@ -73,32 +74,36 @@ def add_aux(
         layout.geolocation_path(), group="/HDFEOS/SWATHS/MODIS_Swath_Type_GEO/Data Fields", chunks=chunks
     )
     atmos_ds: Optional[xr.DataArray] = None
-    atmos_names_to_use: Optional[list[str]] = atmos_names if layout.processing_level == "L2" else None
+    atmos_names_to_use: Optional[list[str]] = None
     if layout.processing_level == "L2":
-        rxr = lazy_rioxarray()
-        atmos_ds = rxr.open_rasterio(layout.path, chunks=chunks)[0]
+        atmos_names_to_use = atmos_names
+        with warn_on_aux_failure("MODIS atmospheric"):
+            rxr = lazy_rioxarray()
+            atmos_ds = rxr.open_rasterio(layout.path, chunks=chunks)[0]
+        if atmos_ds is None:
+            atmos_names_to_use = None
     else:
-        atmos_ds = None
-        atmos_names_to_use = None
         warnings.warn(
             f"Atmospheric variables {atmos_names} requested but not available for processing level {layout.processing_level}"
         )
 
     if angle_names:
-        ds = add_angles(
-            ds=ds,
-            aux_ds=ang_ds,
-            angle_names=angle_names,
-            mtd=mtd,
-        )
+        with warn_on_aux_failure("MODIS angles"):
+            ds = add_angles(
+                ds=ds,
+                aux_ds=ang_ds,
+                angle_names=angle_names,
+                mtd=mtd,
+            )
 
     if atmos_names_to_use:
-        ds = add_atmos(
-            ds=ds,
-            aux_ds=cast(xr.Dataset, atmos_ds),
-            atmos_names=atmos_names_to_use,
-            mtd=mtd,
-        )
+        with warn_on_aux_failure("MODIS atmospheric"):
+            ds = add_atmos(
+                ds=ds,
+                aux_ds=cast(xr.Dataset, atmos_ds),
+                atmos_names=atmos_names_to_use,
+                mtd=mtd,
+            )
 
     if angle_names or atmos_names:
         ds = add_geolocation(ds=ds, geolocation_ds=geolocation_ds, resolution=["1000m"])

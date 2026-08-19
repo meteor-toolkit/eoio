@@ -7,6 +7,7 @@ from eoio.readers.subset.roi_subset import ResolvedROISubset
 from eoio.utils.rasterio_utils import suggest_raster_chunks
 import numpy as np
 from eoio.readers.base import ReaderConfig
+from eoio.utils.aux_read import warn_on_aux_failure
 from typing import Optional, Dict
 import warnings
 
@@ -56,50 +57,54 @@ def add_aux(
 
     # --- Observation geometry ---
     if "observation_geometry" in (aux_names or []):
-        ds = read_obs_geometry(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 OLCI observation geometry"):
+            ds = read_obs_geometry(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     # --- Removed pixels ---
 
     if "removed_pixels" in (aux_names or []) and meas is not None:
-        ds = read_removed_pixels(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 OLCI removed pixels"):
+            ds = read_removed_pixels(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     # --- Instrument data ---
 
     if any(aux in (aux_names or []) for aux in instrument_aux):
-        ds = read_instrument_aux(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 OLCI instrument"):
+            ds = read_instrument_aux(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     # --- Meteorological data ---
 
     if any(aux in (aux_names or []) for aux in meteo_aux):
-        ds = read_meteo_aux(
-            ds=ds,
-            layout=layout,
-            subset=subset,
-            config=config,
-            chunks=config.read_params.get("chunks", None),
-            use_chunks=config.read_params.get("use_chunks", False),
-        )
+        with warn_on_aux_failure("Sentinel-3 OLCI meteo"):
+            ds = read_meteo_aux(
+                ds=ds,
+                layout=layout,
+                subset=subset,
+                config=config,
+                chunks=config.read_params.get("chunks", None),
+                use_chunks=config.read_params.get("use_chunks", False),
+            )
 
     return ds
 
