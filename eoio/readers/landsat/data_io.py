@@ -123,6 +123,13 @@ def read_bands_into_dataset(
                 )
                 da /= np.sin(np.deg2rad(mtd.get_product_metadata().get("sun_elevation")))  # type: ignore[arg-type]
 
+            # Landsat Collection 2 reflectance products use a negative scaled value (e.g.
+            # -0.1) as a fill sentinel for pixels outside the actual acquired footprint,
+            # rather than the encoded_nodata/zero-DN handling above already catching it --
+            # physically, reflectance can't be negative, so any negative value left after
+            # scaling is fill data, not a real (if implausible) measurement.
+            da = da.where(da >= 0)
+
         # name dimensions according to geometry
         geom = band_mtd.get("geometry_id")
         if geom:
