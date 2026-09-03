@@ -65,6 +65,12 @@ import xarray as xr
 from processor_tools import BaseProcessor
 
 from eoio.processors.registry import register_processor
+from eoio.processors.stack._concat import (
+    _cube_attrs_and_coords,
+    _get_nested_attr,
+    _is_scalar_attr,  # noqa: F401 - re-exported for backwards-compatible imports
+    _obs_concat,
+)
 
 
 @register_processor("stack")
@@ -504,65 +510,6 @@ def _common_segment_prefix(names: List[str]) -> str:
         else:
             break
     return "_".join(common) or "ancillary"
-
-
-def _cube_attrs_and_coords(
-    ds: xr.Dataset,
-    var_names: List[str],
-    measurand: str,
-    measurand_attr: str,
-    coord_attrs: Optional[List[str]] = None,
-) -> Tuple[Dict[str, Any], Dict[str, List[Any]]]:
-    """
-    Build attribute dict and coordinate promotions for a stacked cube.
-
-    Attributes are reconciled across constituent variables as follows:
-
-    - **Shared** (identical across all variables): kept as scalar attrs.
-    - **Per-band scalar** (differ but are all numeric or string scalars):
-      promoted to a coordinate variable if the attribute name is in
-      ``coord_attrs``; otherwise kept as a list attr in stacking order.
-    - **Per-band complex** (dicts, lists, or mixed types): kept as a list attr
-      in stacking order. Serialisation to NetCDF/Zarr is left to the caller.
-
-    ``long_name`` and ``ancillary_variables`` are always replaced with
-    cube-level equivalents.
-
-    :returns:
-        Tuple of ``(attrs, to_promote)`` where ``attrs`` is the cube attribute
-        dict and ``to_promote`` maps attribute names to per-element value lists
-        for coordinate assignment.
-    """
-    coord_attrs_set: set = set(coord_attrs or [])
-    first_attrs = dict(ds[var_names[0]].attrs)
-
-    attrs: Dict[str, Any] = {}
-    to_promote: Dict[str, List[Any]] = {}
-
-    for key, first_val in first_attrs.items():
-        if key in ("ancillary_variables",):
-            continue
-        all_vals = [ds[name].attrs.get(key) for name in var_names]
-        if all(v == first_val for v in all_vals[1:]):
-            attrs[key] = first_val
-        elif key == "long_name":
-            pass  # falls back to the measurand-cube default below
-        elif None not in all_vals:
-            if all(_is_scalar_attr(v) for v in all_vals) and key in coord_attrs_set:
-                to_promote[key] = all_vals
-            else:
-                attrs[key] = all_vals
-
-    attrs[measurand_attr] = measurand
-    if "long_name" not in attrs:
-        attrs["long_name"] = measurand
-
-    return attrs, to_promote
-
-
-def _is_scalar_attr(val: Any) -> bool:
-    """Return True if val is a scalar numeric or string — safe to store as a list attr or coordinate."""
-    return isinstance(val, (bool, int, float, str))
 
 
 if __name__ == "__main__":

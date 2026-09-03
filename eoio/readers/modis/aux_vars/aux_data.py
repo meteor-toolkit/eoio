@@ -5,6 +5,7 @@ from typing import Dict, Optional, cast
 import warnings
 from eoio.readers.base import ReaderConfig
 import xarray as xr
+import numpy as np
 from eoio.deps import lazy_rioxarray
 from eoio.readers.modis.aux_vars.angles import add_angles
 from eoio.readers.modis.aux_vars.atmos import add_atmos
@@ -113,12 +114,33 @@ def add_aux(
                 lon = ds["longitude_1000m"]
                 lat = ds["latitude_1000m"]
                 mask = (lat >= y_min) & (lat <= y_max) & (lon >= x_min) & (lon <= x_max)
+            if mask.any():
                 ds = xr.Dataset(
                     {
                         name: da.where(mask, drop=True) if set(mask.dims).issubset(da.dims) else da
                         for name, da in ds.data_vars.items()
                     }
                 )
+            else:
+                # ROI centre
+                x_c = (x_min + x_max) / 2.0
+                y_c = (y_min + y_max) / 2.0
+
+                # Squared distance from ROI centre to every pixel centre
+                dist2 = (lon - x_c) ** 2 + (lat - y_c) ** 2
+
+                # Nearest pixel
+                nearest_flat_idx = dist2.argmin().values
+                iy, ix = np.unravel_index(nearest_flat_idx, dist2.shape)
+
+                if (lat.max() >= y_c) & (lat.min() <= y_c) & (lon.max() >= x_c) & (lon.min() <= x_c):
+                    # ROI is smaller than a pixel but still covered by this pixel
+                    ds = ds.isel(**{f'y_grid_1000m': iy, f'x_grid_1000m': ix})
+                else:
+                    # ROI is outside the grid footprint
+                    raise ValueError(
+                        f"ROI outside dataset footprint. "
+                    )
 
     return ds
 

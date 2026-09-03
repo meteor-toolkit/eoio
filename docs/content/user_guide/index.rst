@@ -10,4 +10,5 @@ examples that describe common usages of eoio.
    :maxdepth: 2
 
    read_func
+   read_multi_func
    satellites_formats
