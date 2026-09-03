@@ -46,6 +46,14 @@ from eoio.readers.radcalnet.metadata import RadCalNetMetadataExtractor
 from eoio.readers.radcalnet.data_io import read_file, read_dataset
 from eoio.readers.base import BaseReader
 
+#: RadCalNet reflectance fill sentinel. Any ``reflectance`` (or
+#: ``reflectance_uncertainty``) value at or above this is a missing-data flag, not a
+#: real measurement, and is converted to NaN on read -- consistent with every other
+#: eoio reader. Physical HCRF is ~0-1.5; RadCalNet's own docs cite a ~9999 fill, but
+#: ERUS files (and likely other sites) emit values around 1000, so the threshold sits
+#: well below any plausible reading while still catching the documented sentinel.
+RADCALNET_REFLECTANCE_FILL_MIN = 1000.0
+
 
 class RADCALNETFileTypeError(ValueError):
     """Error for an incurrect file being passed to the radcalnet reader"""
@@ -163,10 +171,17 @@ class RadCalNetReader(BaseReader):
         # list variables to include
         include_vars = self.list_include_vars()
 
-        # convert missing values to np.nan to be consistent with other eoio readers
-        mask = np.where(ds.reflectance.data >= 9998.0)
-        ds.reflectance.data[mask] = np.nan
-        ds.reflectance_uncertainty.data[mask] = np.nan
+        # Convert RadCalNet's missing-data fill sentinel to NaN, to be consistent with
+        # every other eoio reader. RadCalNet flags an unavailable sample with a large
+        # out-of-range value rather than omitting the row; a position is treated as
+        # missing if either the reflectance or its uncertainty is at/above the fill
+        # threshold (see RADCALNET_REFLECTANCE_FILL_MIN -- lowered from a documented
+        # ~9999 because ERUS files use ~1000, still far outside any real HCRF).
+        fill = (ds.reflectance.data >= RADCALNET_REFLECTANCE_FILL_MIN) | (
+            ds.reflectance_uncertainty.data >= RADCALNET_REFLECTANCE_FILL_MIN
+        )
+        ds.reflectance.data[fill] = np.nan
+        ds.reflectance_uncertainty.data[fill] = np.nan
 
         subset_cfg = self.config.subset
         if not self._time_of_day_utc_explicitly_set:
