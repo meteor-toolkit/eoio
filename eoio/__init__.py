@@ -3,7 +3,7 @@
 # import h5py  # type: ignore
 
 # from eoio._show_versions import show_versions
-from eoio.interface import read, product_options  # (
+from eoio.interface import read, read_multi, product_options  # (
 
 #     product_bounds,
 #     product_processors,

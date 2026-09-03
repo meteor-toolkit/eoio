@@ -1,16 +1,19 @@
 """eoio.interface - interface functions module"""
 
-from typing import Any, Dict, List, Optional, Union
+import glob
+from typing import Any, Callable, Dict, List, Optional, Union
 import xarray as xr
 import os
 from processor_tools import Context
 from eoio.processors.processor_pipeline import ProcessorPipeline
 from eoio.processors.registry import PROCESSOR_REGISTRY
+from eoio.processors.stack._concat import _concat_datasets
 from eoio.readers.factory import ReaderFactory
 from eoio.utils.read_utils import setup_file
 
 __all__ = [
     "read",
+    "read_multi",
     # "product_bounds",
     "product_processors",
     # "mid_lon_lat",
@@ -176,6 +179,168 @@ def read(
         return ds
 
 
+def _resolve_multi_paths(paths: Union[str, List[str]]) -> List[str]:
+    """
+    Resolve the ``paths`` argument of :func:`read_multi` to an explicit,
+    ordered list of file paths.
+
+    * ``list``/``tuple`` – returned as-is (order preserved).
+    * ``str`` pointing at an existing file – single-element list.
+    * ``str`` pointing at an existing directory – every entry inside it that
+      a registered reader recognises (via :class:`ReaderFactory`), sorted by
+      name. Entries no reader recognises are silently skipped.
+    * ``str`` – otherwise treated as a glob pattern, resolved and sorted.
+    """
+    if isinstance(paths, (list, tuple)):
+        resolved = list(paths)
+    elif isinstance(paths, str):
+        if os.path.isdir(paths):
+            reader_factory = ReaderFactory()
+            resolved = []
+            for name in sorted(os.listdir(paths)):
+                candidate = os.path.join(paths, name)
+                try:
+                    reader_factory.get_reader(candidate)
+                except ValueError:
+                    continue
+                resolved.append(candidate)
+        elif os.path.isfile(paths):
+            resolved = [paths]
+        else:
+            resolved = sorted(glob.glob(paths))
+    else:
+        raise TypeError(f"read_multi: paths must be a str or list of str, got {type(paths).__name__}")
+
+    if not resolved:
+        raise ValueError(f"read_multi: no files found for paths={paths!r}")
+
+    return resolved
+
+
+def read_multi(
+    paths: Union[str, List[str]],
+    vars_sel: Optional[Dict[str, List[str]]] = None,
+    subset: Optional[Dict[str, Any]] = None,
+    read_params: Optional[Dict[str, Any]] = None,
+    processors: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+    concat_dim: str = "time",
+    concat_coord: Optional[Union[str, List[Any], Callable[[str, xr.Dataset], Any]]] = None,
+    concat_processors: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+    on_mismatch: str = "error",
+    attrs: str = "reconcile",
+    coord_attrs: Optional[List[str]] = None,
+    *args,
+    **kwargs,
+) -> xr.Dataset:
+    """
+    Read several EO product files as one call and concatenate them along a
+    new (or existing) dimension.
+
+    Each path is read independently via :func:`read` (with identical
+    ``vars_sel``/``subset``/``read_params``/``processors`` applied to every
+    file), then the resulting datasets are concatenated along ``concat_dim``.
+
+    Typical uses are an in-situ time series (e.g. one Hypernets file per
+    measurement cycle, each already carrying its own ``time`` dimension) or a
+    multi-date raster stack (e.g. several Sentinel-2 scenes stacked along a
+    new ``time`` dimension).
+
+    :param paths:
+        Explicit list of product paths, a directory (all files inside it
+        recognised by a registered reader), or a glob pattern. All entries
+        are expected to resolve to the same reader type.
+    :param vars_sel: See :func:`read`. Applied identically to every file.
+    :param subset: See :func:`read`. Applied identically to every file.
+    :param read_params: See :func:`read`. Applied identically to every file.
+    :param processors:
+        Post-processing steps run per file, before concatenation. See
+        :func:`read`.
+    :param concat_dim:
+        Name of the dimension to concatenate along. Default ``"time"``.
+
+        If ``concat_dim`` is already a dimension on every per-file dataset
+        (e.g. in-situ readers that carry their own ``time`` dimension), the
+        datasets are concatenated directly. Otherwise a new dimension is
+        created per file via ``expand_dims``, using the coordinate value
+        resolved from ``concat_coord`` (e.g. a multi-date raster stack).
+    :param concat_coord:
+        How to compute the coordinate value for each file along
+        ``concat_dim`` when a new dimension needs to be created:
+
+        * ``str`` – dot-path into ``ds.attrs``, e.g.
+          ``"product_metadata.sensing_time"``.
+        * ``list`` – explicit values, one per path, same order as the
+          resolved ``paths``.
+        * ``callable(path, ds) -> value`` – escape hatch, e.g. to parse a
+          timestamp out of the filename.
+        * ``None`` (default) – if ``concat_dim`` already exists on every
+          dataset, used as-is; otherwise falls back to file order as an
+          integer index coordinate, with a warning.
+    :param concat_processors:
+        Post-processing steps run once on the final concatenated dataset.
+    :param on_mismatch:
+        How to handle datasets whose variable set or per-file shape (other
+        than ``concat_dim``) doesn't match — this also covers raster grid
+        mismatches (a mismatched x/y shape is just another schema mismatch):
+
+        * ``"error"`` (default) – raise, naming the offending files.
+        * ``"skip"`` – drop mismatched files, with a warning.
+        * ``"union"`` – outer-join concat; missing values become NaN.
+    :param attrs:
+        How to combine dataset-level and per-variable attrs across files:
+
+        * ``"reconcile"`` (default) – attrs identical across every file are
+          kept; attrs that differ are kept as a per-file list attr (or
+          promoted to a coordinate, see ``coord_attrs``) rather than being
+          silently dropped.
+        * ``"first"`` – cheap legacy behaviour: just keep the first file's
+          attrs, discarding the rest (xarray's own ``xr.concat`` default).
+    :param coord_attrs:
+        Dataset-level attribute names to promote to a coordinate on
+        ``concat_dim`` instead of being kept as a list attr — e.g.
+        ``coord_attrs=["product_name"]`` gives you a per-file ``product_name``
+        coordinate alongside ``time``. Only used when ``attrs="reconcile"``.
+    :return:
+        The concatenated ``xarray.Dataset``.
+    """
+    resolved_paths = _resolve_multi_paths(paths)
+
+    datasets = [
+        read(path, vars_sel=vars_sel, subset=subset, read_params=read_params, processors=processors)
+        for path in resolved_paths
+    ]
+
+    ds = _concat_datasets(
+        datasets=datasets,
+        paths=resolved_paths,
+        concat_dim=concat_dim,
+        concat_coord=concat_coord,
+        on_mismatch=on_mismatch,
+        attrs=attrs,
+        coord_attrs=coord_attrs,
+    )
+
+    steps: list = ds.attrs.get("eoio:processing_steps", [])
+    if not isinstance(steps, list):
+        steps = [str(steps)]
+    steps.append(
+        {
+            "processor": "read_multi",
+            "concat_dim": concat_dim,
+            "on_mismatch": on_mismatch,
+            "attrs": attrs,
+            "n_files": len(resolved_paths),
+        }
+    )
+    ds.attrs["eoio:processing_steps"] = steps
+
+    if concat_processors:
+        context = Context({"paths": resolved_paths})
+        ds = process(ds, concat_processors, context)
+
+    return ds
+
+
 # def write(
 #     path_original: Union[str, List[str]],
 #     correction: Dict[str, Union[float, np.ndarray, int]],
@@ -303,7 +468,9 @@ def product_options(path: str, read_params: Optional[Dict[str, Any]] = None, *ar
         return reader_obj.all_options
 
 
-def process(ds: xr.Dataset, processors: Dict[str, Any], context: Optional[Context]) -> xr.Dataset:
+def process(
+    ds: xr.Dataset, processors: Union[Dict[str, Any], List[Dict[str, Any]]], context: Optional[Context]
+) -> xr.Dataset:
     """
     Runs a user-defined processing pipeline on an xarray Dataset.
 

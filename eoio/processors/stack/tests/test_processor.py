@@ -329,6 +329,18 @@ class TestStackCubes:
         assert pm[0]["band"] == "B02"
         assert pm[1]["band"] == "B03"
 
+    def test_array_valued_attr_does_not_raise(self):
+        # regression case: some products (e.g. Hypernets) carry array-valued
+        # variable attrs, such as empty placeholder arrays for unused
+        # uncertainty-effect parameters. Plain `==` on two arrays returns an
+        # array, not a bool, which used to raise inside StackCubes.run().
+        empty = np.array([], dtype="float64")
+        ds = xr.Dataset()
+        ds["B02"] = _da(("y_10m", "x_10m"), measurand="toa_reflectance", extra_attrs={"err_corr_1_units": empty})
+        ds["B03"] = _da(("y_10m", "x_10m"), measurand="toa_reflectance", extra_attrs={"err_corr_1_units": empty.copy()})
+        result = StackCubes().run(ds)
+        assert np.array_equal(result["toa_reflectance_10m"].attrs["err_corr_1_units"], empty)
+
     def test_custom_stack_dim_name(self, s2_like_ds):
         result = StackCubes(params={"stack_dim": "band"}).run(s2_like_ds)
         assert "band_10m" in result["toa_reflectance_10m"].dims

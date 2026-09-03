@@ -6,7 +6,7 @@ ds = read(
     r"T:\ECO\EOServer\data\unittest_datasets\MODIS\MOD09.A2024122.0830.061.2024124062519.hdf",
     vars_sel={"aux": "all", "meas": "all"},
     subset={
-        "roi": (15.1, 30, 15.13, 30.1),  # ((5, -20), 10000), # (mid_lon_lat(s2_l1c_filepaths[0]), 3000),
+        "roi": (15.111, 30, 15.112, 30.001),  # ((5, -20), 10000), # (mid_lon_lat(s2_l1c_filepaths[0]), 3000),
         "roi_crs": 4326,
     },
     read_params={

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import dist
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -75,9 +76,31 @@ def read_bands_into_dataset(
             lon = ds[f"longitude_{preferred_resolution}m"]
             lat = ds[f"latitude_{preferred_resolution}m"]
             mask = (lat >= y_min) & (lat <= y_max) & (lon >= x_min) & (lon <= x_max)
-            da = da.where(mask, drop=True)
-            ds = ds.where(mask, drop=True)
+            if mask.any():
+                da = da.where(mask, drop=True)
+                ds = ds.where(mask, drop=True)
+            else:
+                # ROI centre
+                x_c = (x_min + x_max) / 2.0
+                y_c = (y_min + y_max) / 2.0
 
+                # Squared distance from ROI centre to every pixel centre
+                dist2 = (lon - x_c) ** 2 + (lat - y_c) ** 2
+
+                # Nearest pixel
+                nearest_flat_idx = dist2.argmin().values
+                iy, ix = np.unravel_index(nearest_flat_idx, dist2.shape)
+
+                if (lat.max() >= y_c) & (lat.min() <= y_c) & (lon.max() >= x_c) & (lon.min() <= x_c):
+                    # ROI is smaller than a pixel but still covered by this pixel
+                    da = da.isel(**{f'y_grid_{preferred_resolution}m': iy, f'x_grid_{preferred_resolution}m': ix})
+                    ds = ds.isel(**{f'y_grid_{preferred_resolution}m': iy, f'x_grid_{preferred_resolution}m': ix})
+                else:
+                    # ROI is outside the grid footprint
+                    raise ValueError(
+                        f"ROI outside dataset footprint. "
+                    )
+            
     for var in meas_vars:
         var_mtd = mtd.variable_product_metadata(var) or {}
         var_da = da[var_mtd["band_id"]].isel(band=var_mtd["band_idx"])
