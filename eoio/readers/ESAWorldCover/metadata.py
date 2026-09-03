@@ -68,7 +68,8 @@ class ESAWorldCoverMetadataExtractor(BaseMetadataExtractor):
             "spatial_resolution": 10,
             "geometry_ids": "10m",
             "product_bounds": bounds,
-            "product_date": self._extract_year(),
+            # Annual composite -- only a year is published, no finer date/time granularity.
+            "product_datetime": self._extract_year(),
             "description": (
                 "ESA WorldCover global land cover map at 10 m spatial resolution "
                 "derived from Sentinel-1 GRD and Sentinel-2 L2A observations."

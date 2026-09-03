@@ -85,7 +85,10 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
             "geometry_ids": [f"{resolution}m"],
             "product_geospatial_bounds": bbox,
             "geospatial_bounds_crs": "EPSG:4326",
-            "product_date": self._text(
+            # Only date granularity is published for this product (a static elevation
+            # composite, no acquisition time-of-day concept) -- source tag is gco:Date, not
+            # gco:DateTime.
+            "product_datetime": self._text(
                 root,
                 ".//gmd:CI_Citation/gmd:date//gco:Date",
             ),

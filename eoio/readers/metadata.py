@@ -224,7 +224,10 @@ class BaseMetadataExtractor(ABC):
             "spatial_resolution": "",
             "geometry_ids": "",
             "product_bounds": "",
-            "product_date": "",
+            # Full date+time where the source data supports it (e.g. an ISO 8601 datetime
+            # string/object). Some products only ever have date granularity available (e.g.
+            # RadCalNet's daily files spanning many timestamps, or an annual composite like
+            # ESA WorldCover) -- for those, this holds just the date, not a fabricated time.
             "product_datetime": "",
             "description": "",
             "eoio:reader": "",

@@ -38,7 +38,6 @@ class TestMetadata(unittest.TestCase):
         ds.attrs["site_id"] = "site"
         ds.attrs["product_name"] = "prod"
         ds.attrs["product_level"] = "L1"
-        ds.attrs["product_date"] = "2020-01-01"
         reader = HYPERNETSReader("dummy_path")
         basic_md = HYPERNETSMetadataExtractor(reader, ds).get_basic_metadata()
         assert basic_md["collection_name"] == "site"
@@ -59,7 +58,6 @@ class TestMetadata(unittest.TestCase):
         ds.attrs["site_id"] = "site"
         ds.attrs["product_name"] = "prod"
         ds.attrs["product_level"] = "L1"
-        ds.attrs["product_date"] = "2020-01-01"
         reader = HYPERNETSReader("dummy_path")
         basic_md = HYPERNETSMetadataExtractor(reader, ds).get_basic_metadata()
 
@@ -75,7 +73,6 @@ class TestMetadata(unittest.TestCase):
         ds.attrs["site_id"] = "site"
         ds.attrs["product_name"] = "prod"
         ds.attrs["product_level"] = "L1"
-        ds.attrs["product_date"] = "2020-01-01"
         reader = HYPERNETSReader("dummy_path", subset={"wavelength": {"min": 400, "max": 900}})
         basic_md = HYPERNETSMetadataExtractor(reader, ds).get_basic_metadata()
 

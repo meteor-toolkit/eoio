@@ -160,7 +160,7 @@ class TestS3OLCIMetadataExtractor(unittest.TestCase):
         self.assertIn("spatial_resolution", metadata)
         self.assertIn("geometry_ids", metadata)
         self.assertIn("product_bounds", metadata)
-        self.assertIn("product_date", metadata)
+        self.assertIn("product_datetime", metadata)
         self.assertIn("footprint", metadata)
         self.assertIsInstance(metadata["footprint"], dict)
 
@@ -178,7 +178,6 @@ class TestS3OLCIMetadataExtractor(unittest.TestCase):
         self.assertEqual(metadata["spatial_resolution"], 300)
         self.assertIn("S3A_OL_1_EFR", metadata["product_name"])
         self.assertTrue(metadata["product_bounds"].startswith("POLYGON"))
-        self.assertEqual(metadata["product_date"], dt.date(2023, 6, 15))
         self.assertEqual(
             metadata["product_datetime"], dt.datetime(2023, 6, 15, 10, 30, 45, 123456, tzinfo=dt.timezone.utc)
         )

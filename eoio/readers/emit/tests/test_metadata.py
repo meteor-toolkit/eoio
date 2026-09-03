@@ -70,7 +70,6 @@ class TestMetadata(unittest.TestCase):
         self.assertIn("platform", md)
         self.assertIn("product_bounds", md)
         self.assertIn("history", md)
-        self.assertEqual(md["product_date"], "2020-01-01")
         self.assertEqual(md["product_datetime"], "2020-01-01T00:00:00")
 
     def test_eoio_subset_is_valid_json(self):

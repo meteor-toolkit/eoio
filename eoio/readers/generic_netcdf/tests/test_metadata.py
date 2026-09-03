@@ -29,11 +29,10 @@ class TestGenericNetCDFMetadataExtractor(unittest.TestCase):
     def test_product_datetime_passes_through_from_source_attrs(self):
         ds = xr.Dataset(
             {"var1": ("series", [1, 2])},
-            attrs={"product_date": "2023-01-15", "product_datetime": "2023-01-15T10:30:45"},
+            attrs={"product_datetime": "2023-01-15T10:30:45"},
         )
         extractor = GenericNetCDFMetadataExtractor(self.reader, ds)
         md = extractor.get_basic_metadata()
-        self.assertEqual(md["product_date"], "2023-01-15")
         self.assertEqual(md["product_datetime"], "2023-01-15T10:30:45")
 
     def test_product_datetime_defaults_to_empty_string_when_absent(self):
