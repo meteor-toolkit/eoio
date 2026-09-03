@@ -537,6 +537,93 @@ def _write_synthetic_ascii_file(suffix: str) -> str:
     return path
 
 
+def _write_ascii_with_reflectance(suffix: str, refl_pairs) -> str:
+    """Like :py:func:`_write_synthetic_ascii_file` but with caller-supplied reflectance
+    rows, for testing fill-value masking.
+
+    :param refl_pairs: list of ``(wavelength, reflectance_values, uncertainty_values)``,
+        each ``*_values`` a length-13 list of strings written as that wavelength's
+        reflectance row and (repeated key) its uncertainty row.
+    """
+    n = 13
+
+    def row(v):
+        return "\t".join([str(v)] * n)
+
+    utc_times = [
+        (datetime.datetime(2021, 1, 1, 8, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)
+    ]
+    local_times = [
+        (datetime.datetime(2021, 1, 1, 9, 0) + datetime.timedelta(minutes=30 * i)).strftime("%H%M") for i in range(n)
+    ]
+
+    lines = [
+        "Site:\tGONA01",
+        "Lat:\t-23.59999",
+        "Lon:\t15.119215",
+        "Alt:\t510.0",
+        "Year\t" + row("2021"),
+        "DOY(U)\t" + row("286"),
+        "UTC\t" + "\t".join(utc_times),
+        "DOY(L)\t" + row("286"),
+        "Local\t" + "\t".join(local_times),
+    ]
+    for wavelength, refl_values, unc_values in refl_pairs:
+        lines.append(f"{wavelength}\t" + "\t".join(str(v) for v in refl_values))
+        lines.append(f"{wavelength}\t" + "\t".join(str(v) for v in unc_values))
+    for aux in ("P", "T", "WV", "O3", "AOD", "Ang"):
+        lines.append(f"{aux}\t" + row("1.0"))
+        lines.append(f"{aux}\t" + row("0.1"))
+    lines += ["Zen\t" + row("40.1"), "Azi\t" + row("120.5"), "Type\t" + row("R")]
+    if suffix == ".output":
+        lines.append("esd\t" + row("1.0161"))
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    with os.fdopen(fd, "w") as f:
+        f.write("\n".join(lines))
+    return path
+
+
+class testReflectanceFillMasking(unittest.TestCase):
+    """RadCalNet flags an unavailable reflectance sample with a large out-of-range
+    sentinel (documented ~9999, but ERUS files use ~1000) rather than omitting the row.
+    open_dataset() must convert those -- and the matching uncertainty -- to NaN, like
+    every other eoio reader's missing-data handling."""
+
+    def _open(self, refl_pairs):
+        path = _write_ascii_with_reflectance(".output", refl_pairs)
+        self.addCleanup(os.unlink, path)
+        # time_of_day_utc=None keeps all 13 columns (no per-site daylight window)
+        return RadCalNetReader(path, subset={"time_of_day_utc": None}).open_dataset()
+
+    def test_reflectance_at_or_above_1000_is_masked(self):
+        ds = self._open(
+            [("500", ["0.30"] * 11 + ["1000.0", "9999.0"], ["0.01"] * 13)],
+        )
+        refl = ds["reflectance"].sel(wavelength=500).values
+        self.assertTrue(np.isnan(refl[11]))
+        self.assertTrue(np.isnan(refl[12]))
+        self.assertFalse(np.isnan(refl[0]))
+        self.assertAlmostEqual(float(refl[0]), 0.30, places=6)
+
+    def test_matching_uncertainty_is_masked_where_reflectance_is_fill(self):
+        ds = self._open(
+            [("500", ["0.30"] * 12 + ["1000.0"], ["0.01"] * 13)],
+        )
+        self.assertTrue(np.isnan(ds["reflectance_uncertainty"].sel(wavelength=500).values[12]))
+        self.assertFalse(np.isnan(ds["reflectance_uncertainty"].sel(wavelength=500).values[0]))
+
+    def test_reflectance_is_masked_where_only_its_uncertainty_is_fill(self):
+        ds = self._open(
+            [("500", ["0.30"] * 13, ["0.01"] * 12 + ["1000.0"])],
+        )
+        self.assertTrue(np.isnan(ds["reflectance"].sel(wavelength=500).values[12]))
+        self.assertTrue(np.isnan(ds["reflectance_uncertainty"].sel(wavelength=500).values[12]))
+
+    def test_all_valid_reflectance_is_left_untouched(self):
+        ds = self._open([("500", ["0.42"] * 13, ["0.01"] * 13)])
+        self.assertFalse(np.isnan(ds["reflectance"].sel(wavelength=500).values).any())
+
+
 class testVariableNamingAndAttrs(unittest.TestCase):
     """Regression tests for RadCalNet's variable naming and CF-style attrs: the raw ascii
     file's own abbreviated column headers (P, T, WV, ...) are translated to descriptive
