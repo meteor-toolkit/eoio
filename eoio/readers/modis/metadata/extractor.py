@@ -92,7 +92,6 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             "spatial_resolution": res,
             "geometry_ids": geoms,
             "geospatial_bounds": "TBC",
-            "product_date": self.prod_hdf_reader.attrs.get("RANGEBEGINNINGDATE", "TBC"),
             "product_datetime": self.prod_hdf_reader.attrs.get("RANGEBEGINNINGDATE", "TBC")
             + "T"
             + self.prod_hdf_reader.attrs.get("RANGEBEGINNINGTIME", "TBC"),

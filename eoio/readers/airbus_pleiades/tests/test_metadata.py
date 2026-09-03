@@ -147,7 +147,6 @@ class TestPleiadesMetadataExtractor(unittest.TestCase):
                 "spatial_resolution",
                 "geometry_ids",
                 "product_geospatial_bounds",
-                "product_date",
                 "product_datetime",
                 "description",
                 "footprint",
@@ -172,7 +171,6 @@ class TestPleiadesMetadataExtractor(unittest.TestCase):
             self.assertEqual(result["instrument"], "PHR_1A")
             self.assertEqual(result["processing_level"], "ORT_MS")
             self.assertEqual(result["satellite_id"], "PHR_1A")
-            self.assertEqual(result["product_date"], "2023-01-15")
             self.assertEqual(result["product_datetime"], "2023-01-15T10:30:45.123456")
 
     def test_get_product_metadata(self):

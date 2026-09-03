@@ -35,7 +35,6 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.mock_xml.find_sensor_id.return_value = "OLI_TIRS"
         self.mock_xml.find_processing_level.return_value = "L1TP"
         self.mock_xml.find_collection_number.return_value = "02"
-        self.mock_xml.find_acquisition_date.return_value = dt.datetime(2025, 5, 19, 10, 42, 12, tzinfo=dt.timezone.utc)
         self.mock_xml.find_acquisition_datetime.return_value = dt.datetime(
             2025, 5, 19, 10, 42, 12, tzinfo=dt.timezone.utc
         )

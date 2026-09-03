@@ -113,7 +113,6 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
         lat = self.ds.attrs["site_latitude"]
         lon = self.ds.attrs["site_longitude"]
         datetime = convert_datetime(np.nanmean(self.ds.acquisition_time.values))
-        date = datetime.date()
         basic_md = {
             "collection_name": self.ds.attrs["site_id"],
             "product_name": self.ds.attrs["product_name"],
@@ -123,7 +122,6 @@ class HYPERNETSMetadataExtractor(BaseMetadataExtractor):
             "spatial_resolution": "NA",
             "geometry_ids": "insitu",
             "product_bounds": f"POINT ({lon} {lat})",
-            "product_date": str(date),
             "product_datetime": datetime,
             "description": "TBD",
             "eoio:reader": "hypernets",

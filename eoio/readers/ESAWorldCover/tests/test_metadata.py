@@ -40,7 +40,7 @@ class TestESAWorldCoverMetadataExtractor(unittest.TestCase):
         md = extractor.get_basic_metadata()
 
         self.assertEqual(md["collection_name"], "ESA WorldCover")
-        self.assertEqual(md["product_date"], "2021")
+        self.assertEqual(md["product_datetime"], "2021")
         self.assertEqual(md["product_bounds"], "")
 
     def test_variable_metadata(self):

@@ -119,7 +119,6 @@ class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
             "spatial_resolution": self.ds.attrs.get("spatial_resolution", ""),
             "geometry_ids": self.ds.attrs.get("geometry_ids", ""),
             "product_bounds": self.ds.attrs.get("product_bounds", ""),
-            "product_date": self.ds.attrs.get("product_date", ""),
             "product_datetime": self.ds.attrs.get("product_datetime", ""),
             "description": self.ds.attrs.get("description", ""),
             "eoio:reader": "generic_netcdf",

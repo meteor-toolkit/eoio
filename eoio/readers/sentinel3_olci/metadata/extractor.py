@@ -118,7 +118,6 @@ class S3OLCIMetadataExtractor(BaseMetadataExtractor):
                 "spatial_resolution_units": "m",
                 "geometry_ids": "300m",
                 "product_bounds": self.xml_reader.find_bounds().wkt,
-                "product_date": self.xml_reader.find_acquisition_start_date(),
                 "product_datetime": self.xml_reader.find_acquisition_start_datetime(),
                 "description": "TBD",
                 "image_size": f"{rows}x{cols}" if rows and cols else None,

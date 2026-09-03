@@ -121,7 +121,6 @@ class PleiadesMetadataExtractor(BaseMetadataExtractor):
             ],
             "product_geospatial_bounds": get_value(full_extracted_metadata, "Dataset_Extent"),
             "located_geometric_values": get_value(full_extracted_metadata, "Located_Geometric_Values"),
-            "product_date": str(date.date()),
             "product_datetime": date.isoformat(),
             "description": "TBD",
             "institution": "Airbus",
