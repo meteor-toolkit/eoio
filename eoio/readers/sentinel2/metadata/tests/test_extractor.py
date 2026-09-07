@@ -435,14 +435,28 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         md = ex.get_variable_basic_metadata("solar_zenith_angle")
         self.assertEqual(md["units"], "degrees")
         self.assertEqual(md["standard_name"], "solar_zenith_angle")
-        self.assertEqual(md["measurand"], "angle")
+        self.assertEqual(md["measurand"], "solar_zenith_angle")
         self.assertEqual(md["long_name"], "solar zenith angle")
+
+        md = ex.get_variable_basic_metadata("solar_azimuth_angle")
+        self.assertEqual(md["measurand"], "solar_azimuth_angle")
 
         md = ex.get_variable_basic_metadata("viewing_zenith_angle_B02")
         self.assertEqual(md["measurand"], "viewing_zenith_angle")
 
         md = ex.get_variable_basic_metadata("viewing_azimuth_angle_B02")
         self.assertEqual(md["measurand"], "viewing_azimuth_angle")
+
+        # Regression: solar_zenith_angle and solar_azimuth_angle must have *different*
+        # measurand values, not just individually-correct ones. eoio.processors.stack
+        # groups variables for stacking by (measurand, dims) -- if both angles shared one
+        # measurand and ever ended up on the same dims (e.g. both independently
+        # interpolated onto the same target grid, which drops the CF ancillary_variables
+        # link that would otherwise exclude them from stacking), they'd be concatenated
+        # together into one cube despite being different physical quantities.
+        zenith_md = ex.get_variable_basic_metadata("solar_zenith_angle")
+        azimuth_md = ex.get_variable_basic_metadata("solar_azimuth_angle")
+        self.assertNotEqual(zenith_md["measurand"], azimuth_md["measurand"])
 
     @patch(
         "eoio.readers.sentinel2.metadata.extractor.BaseMetadataExtractor.__init__",
