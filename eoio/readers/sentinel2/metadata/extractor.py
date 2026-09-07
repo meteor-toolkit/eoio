@@ -197,6 +197,10 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
                 basic_metadata["measurand"] = "viewing_zenith_angle"
             elif var.startswith("viewing_azimuth"):
                 basic_metadata["measurand"] = "viewing_azimuth_angle"
+            elif var == "solar_zenith_angle":
+                basic_metadata["measurand"] = "solar_zenith_angle"
+            elif var == "solar_azimuth_angle":
+                basic_metadata["measurand"] = "solar_azimuth_angle"
             else:
                 basic_metadata["measurand"] = "angle"
 

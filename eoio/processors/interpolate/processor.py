@@ -18,6 +18,8 @@ processors = {
 """
 
 from __future__ import annotations
+import copy
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 from processor_tools import BaseProcessor
@@ -25,6 +27,113 @@ import xarray as xr
 from eoio.processors.registry import register_processor
 import numpy as np
 from scipy.interpolate import griddata
+
+
+def _grid_suffix_from_dims(dims: Sequence) -> Optional[str]:
+    """
+    Return the resolution suffix encoded in dimension names.
+
+    E.g. ``('y_60m', 'x_60m')`` -> ``'60m'``. Mirrors the identical helper in
+    :py:mod:`eoio.processors.stack.processor` and
+    :py:mod:`eoio.processors.datatree.processor` (kept as separate private
+    copies per this codebase's existing convention rather than a shared import).
+
+    :param dims: dimension names to inspect.
+    :return: the resolution suffix, or ``None`` if no ``x_``/``y_``-prefixed
+        dimension is present.
+    """
+    for dim in dims:
+        sdim = str(dim)
+        if sdim.startswith("x_"):
+            return sdim[2:]
+        if sdim.startswith("y_"):
+            return sdim[2:]
+    return None
+
+
+# product_metadata keys this function will touch -- deliberately narrow. Anything else in
+# product_metadata (band_central_wavelength, band_id, radiometric_offset, ...) is specific
+# to *what* the variable is, not *which grid* it's on, and must never be copied from a donor
+# or otherwise altered here -- see _refresh_grid_metadata's docstring for the bug this guards
+# against.
+_GRID_METADATA_KEYS = ("geometry_id", "spatial_resolution", "spatial_resolution_units", "geoposition")
+
+
+def _refresh_grid_metadata(ds: xr.Dataset, var_names: Sequence[str]) -> None:
+    """
+    Refresh resolution-dependent ``product_metadata`` on variables just interpolated
+    onto a new grid, in place.
+
+    Readers (e.g. eoio's Sentinel-2 reader) set a ``product_metadata`` attrs dict
+    once at read time, describing a variable's *original* grid (``geometry_id``,
+    ``spatial_resolution``, ``geoposition``, ...). Interpolating a variable onto a
+    different grid changes its dims but doesn't touch this metadata, leaving it
+    stale -- which silently breaks downstream consumers keyed off it, notably
+    :py:class:`~eoio.processors.datatree.processor.ToDataTree`'s ``grid_attr``
+    option: it would file the interpolated variable into a node for its *old*
+    grid, not the one its dims actually describe.
+
+    If another variable in *ds* already sits natively on the new grid (same dims,
+    carries its own ``product_metadata``), that variable's metadata is the
+    authoritative description of the new grid -- but only :py:data:`_GRID_METADATA_KEYS`
+    are copied from it, never the whole dict. An earlier version of this function copied
+    the donor's ``product_metadata`` wholesale, which also copied *band*-identifying keys
+    like ``band_central_wavelength`` onto variables that never had one (e.g. interpolating
+    Sentinel-2's scene-wide solar angles, which aren't tied to any one band): two such
+    variables borrowing the same donor ended up with the *same* borrowed wavelength, which
+    broke :py:class:`~eoio.processors.stack.processor.StackCubes`'s wavelength-based
+    stacking order downstream with a "duplicate values" alignment error. If no donor is
+    found, the known keys are instead patched in place on a best-effort basis, and
+    ``geoposition`` -- which can't be recomputed without a donor -- is dropped with a
+    warning rather than left silently wrong.
+
+    :param ds: dataset to update in place.
+    :param var_names: names of variables that were just interpolated.
+    """
+    touched = set(var_names)
+    for name in var_names:
+        if name not in ds.variables:
+            continue
+        da = ds[name]
+        suffix = _grid_suffix_from_dims(da.dims)
+        if not suffix:
+            continue
+
+        pm = da.attrs.get("product_metadata")
+        if not isinstance(pm, dict):
+            continue
+        pm = dict(pm)
+
+        donor = next(
+            (
+                other
+                for other_name, other in ds.data_vars.items()
+                if other_name not in touched
+                and tuple(other.dims) == tuple(da.dims)
+                and isinstance(other.attrs.get("product_metadata"), dict)
+            ),
+            None,
+        )
+        if donor is not None:
+            donor_pm = donor.attrs["product_metadata"]
+            for key in _GRID_METADATA_KEYS:
+                if key in donor_pm:
+                    pm[key] = copy.deepcopy(donor_pm[key])
+                else:
+                    pm.pop(key, None)
+        else:
+            pm["geometry_id"] = suffix
+            if suffix.endswith("m") and suffix[:-1].isdigit():
+                pm["spatial_resolution"] = int(suffix[:-1])
+            if "geoposition" in pm:
+                del pm["geoposition"]
+                warnings.warn(
+                    f"interpolate: no donor variable found already on the new grid ({suffix!r}) for "
+                    f"{name!r} -- its stale 'geoposition' metadata has been dropped rather than left "
+                    "incorrect; other product_metadata keys were patched in place."
+                )
+
+        da.attrs["product_metadata"] = pm
 
 
 @dataclass(frozen=True)
@@ -39,6 +148,7 @@ class InterpolateConfig:
     method: str = "linear"
     inplace: Optional[bool] = False
     on_missing: str = "error"  # "error" | "skip"
+    drop_original: bool = False
 
 
 @register_processor("interpolate")
@@ -65,9 +175,23 @@ class Interpolate(BaseProcessor):
         Must be supported by the underlying interpolation implementation (e.g. xarray.interp()).
     :param inplace:
         Bool, if False, new interpolated variables are added to the dataset with the suffix '_interp' (e.g. 'B02_interp'). If True, original variables are replaced by interpolated ones. Default is False.
+        Either way the source-grid coordinates (those named in ``coords``) are left in place, so the same grid can feed several ``interpolate`` steps in one pipeline.
     :param on_missing:
         Behaviour if required metadata for conversion is missing.
         Supported values are ``"error"`` (default, if omitted) or ``"skip"``.
+    :param drop_original:
+        Bool, if True, drop the source variable(s) (the ones named in ``data_vars``, or every
+        variable that had the interpolation coords as a dimension if ``data_vars`` was omitted)
+        after producing the interpolated copy. Only meaningful when ``inplace`` is False -- when
+        ``inplace`` is True there's no separate original left to drop, so this is a no-op in
+        that case. Default is False, matching :py:class:`~eoio.processors.stack.processor.StackCubes`'s
+        ``drop_originals`` default.
+
+        Be careful when the same source variable is interpolated to *multiple* target grids
+        across several ``interpolate`` steps in one pipeline (e.g. a shared solar angle
+        interpolated onto three different band resolutions): only set ``drop_original=True`` on
+        the *last* such step, since dropping the source after the first would leave nothing for
+        the remaining steps to interpolate from.
 
     Notes
     -----
@@ -81,6 +205,7 @@ class Interpolate(BaseProcessor):
         "method": "Interpolation method (e.g. 'linear', 'nearest', etc.). Must be supported by the underlying interpolation implementation (e.g. xarray.interp()).",
         "inplace": "Bool, if False, new interpolated variables are added to the dataset with the suffix '_interp' (e.g. 'B02_interp'). If True, original variables are replaced by interpolated ones. Default is False.",
         "on_missing": "Behaviour if required metadata for conversion is missing. Supported values are 'error' (default, if omitted) or 'skip'.",
+        "drop_original": "Bool, if True, drop the source variable(s) after producing the interpolated copy (no-op when inplace=True). Default is False.",
     }
 
     def __init__(
@@ -144,6 +269,9 @@ class Interpolate(BaseProcessor):
         if on_missing not in {"error", "skip"}:
             raise ValueError("interpolate: 'on_missing' must be 'error' or 'skip'.")
 
+        # resolve "drop_original" param
+        drop_original = bool(params.get("drop_original", False))
+
         return InterpolateConfig(
             coords=coords,
             target_grid=target_grid,
@@ -151,6 +279,7 @@ class Interpolate(BaseProcessor):
             method=method,
             inplace=inplace,
             on_missing=on_missing,
+            drop_original=drop_original,
         )
 
     def _format_target_grid(self, ds: xr.Dataset, target_grid: Sequence) -> Sequence:
@@ -216,6 +345,8 @@ class Interpolate(BaseProcessor):
             vars_to_interpolate: Sequence = list(set(vars_with_coord).intersection(self.interpolate_config.data_vars))
         else:
             vars_to_interpolate = vars_with_coord
+
+        original_source_names = [str(v) for v in vars_to_interpolate]
 
         # if inplace is False, create new variables with '_interp' suffix and assign them to the dataset, and also create new coordinates with '_interp' suffix, then interpolate in place on the new variables.
         if not self.interpolate_config.inplace:
@@ -326,14 +457,15 @@ class Interpolate(BaseProcessor):
                             continue
                     ds[var] = ds[var].interp(coords=interp_input, method=self.interpolate_config.method)  # type: ignore[arg-type]
         # rename new variables with resolution of new grid as suffix (e.g. "B02_interp_60m" instead of "B02_interp_0") - only if using coordinate-name lists
+        final_var_names: List[str] = []
         if using_indexed_placeholders:
             for var in vars_to_interpolate:
                 var = str(var)
+                renamed = False
                 if "_interp_" in var:
                     # Extract the resolution from the target coordinate
                     target_resolution = None
                     for coord, target_coord in zip(coords, target_coords):
-                        coord = str(coord)
                         if isinstance(target_coord, list):
                             for individual_coord, individual_target in zip(coord, target_coord):
                                 individual_coord = str(individual_coord)
@@ -361,12 +493,65 @@ class Interpolate(BaseProcessor):
                     if target_resolution:
                         new_var_name = f"{str(var).split('_interp', 1)[0]}_{str(target_resolution).split('_')[-1]}"
                         ds = ds.rename({var: new_var_name})
+                        final_var_names.append(new_var_name)
+                        renamed = True
+                if not renamed:
+                    final_var_names.append(var)
+        elif not self.interpolate_config.inplace:
+            # "Custom grid" (single named-coordinate target) case: rename "<var>_interp" to
+            # a resolution-suffixed name derived from the output's own dims, e.g.
+            # "solar_zenith_angle_interp" -> "solar_zenith_angle_60m" when the target was the
+            # coordinate "x_60m"/"y_60m". Only attempted when every target in this call was
+            # itself a named coordinate reference (a plain string) -- when interpolating onto a
+            # raw array/list target instead, .interp() doesn't rename the output dim at all (it
+            # keeps the "<coord>_interp" placeholder name), so there is no real grid identity to
+            # derive a suffix from; deriving one from that placeholder name would misfire (e.g.
+            # coord "x_5000m" -> placeholder dim "x_5000m_interp" looks like a resolvable "x_"
+            # suffix but isn't one) and both the rename and the metadata patch below are skipped
+            # in that case, leaving the previous "_interp"-suffixed behaviour unchanged.
+            targets_are_named_coords = all(isinstance(t, str) for t in self.interpolate_config.target_grid)
+            for var in vars_to_interpolate:
+                var = str(var)
+                suffix = (
+                    _grid_suffix_from_dims(ds[var].dims) if targets_are_named_coords and var in ds.variables else None
+                )
+                if suffix and var.endswith("_interp"):
+                    new_var_name = f"{var[: -len('_interp')]}_{suffix}"
+                    ds = ds.rename({var: new_var_name})
+                    final_var_names.append(new_var_name)
+                # else: not a named-coordinate target, so the output dim is just a
+                # placeholder ("<coord>_interp") with no real grid identity -- deliberately
+                # not added to final_var_names, so _refresh_grid_metadata below leaves its
+                # (unrenamed) product_metadata alone rather than misreading the placeholder.
+        else:
+            final_var_names = [str(v) for v in vars_to_interpolate]
 
-        # clean up dataset, removing placeholder coords
+        _refresh_grid_metadata(ds, final_var_names)
+
+        if self.interpolate_config.drop_original and not self.interpolate_config.inplace:
+            to_drop = [name for name in original_source_names if name in ds.variables and name not in final_var_names]
+            if to_drop:
+                ds = ds.drop_vars(to_drop)
+
+        ds = self._drop_placeholder_coords(ds, coords, target_coords)
+
+        return ds
+
+    def _drop_placeholder_coords(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
+        """Remove the ``"_interp"`` placeholder coords the ``inplace=False`` path adds.
+
+        No-op when ``inplace`` is True: there are no placeholders then, and *coords*
+        still holds the caller's own source-grid coord names. Dropping one would delete
+        a grid a *later* interpolate step in the same pipeline may still need to
+        interpolate a *different* variable from -- e.g. Sentinel-2's shared solar
+        angles, interpolated onto the 60m/20m/10m band grids in three separate steps
+        off the same 5000m tie-point grid.
+        """
+        if self.interpolate_config.inplace:
+            return ds
         for coord, target_coord in zip(coords, target_coords):
             if isinstance(target_coord, (xr.DataArray, str)) and coord not in ds.dims:
                 ds = ds.reset_coords(names=coord, drop=True)
-
         return ds
 
     def _run_coords(self, ds: xr.Dataset, coords, target_coords) -> xr.Dataset:
@@ -390,7 +575,9 @@ class Interpolate(BaseProcessor):
         else:
             vars_to_interpolate = vars_with_coord
 
-            # if inplace is False, create new variables with '_interp' suffix and assign them to the dataset, and also create new coordinates with '_interp' suffix, then interpolate in place on the new variables.
+        original_source_names = [str(v) for v in vars_to_interpolate]
+
+        # if inplace is False, create new variables with '_interp' suffix and assign them to the dataset, and also create new coordinates with '_interp' suffix, then interpolate in place on the new variables.
         if not self.interpolate_config.inplace:
             # Check if we have list-of-coordinate-names targets (vs custom grids)
             has_list_of_coords = any(
@@ -485,6 +672,7 @@ class Interpolate(BaseProcessor):
                 )
 
         # perform interpolation
+        final_var_names: List[str] = []
         for cs, tcs in interpolation_groups:
             points = np.column_stack((ds[cs[1]].values.ravel(), ds[cs[0]].values.ravel()))
             lon_target = tcs[1].values
@@ -505,12 +693,18 @@ class Interpolate(BaseProcessor):
                 ds[var] = (("y_grid_" + target_resolution, "x_grid_" + target_resolution), interp_data)
 
                 if not self.interpolate_config.inplace:
-                    ds = ds.rename({var: f"{var.split('_interp', 1)[0]}_{target_resolution}"})
+                    new_var_name = f"{var.split('_interp', 1)[0]}_{target_resolution}"
+                    ds = ds.rename({var: new_var_name})
+                    final_var_names.append(new_var_name)
+                else:
+                    final_var_names.append(var)
 
-        # clean up dataset, removing placeholder coords
-        for coord, target_coord in zip(coords, target_coords):
-            if isinstance(target_coord, (xr.DataArray, str)) and coord not in ds.dims:
-                ds = ds.reset_coords(names=coord, drop=True)
+        if self.interpolate_config.drop_original and not self.interpolate_config.inplace:
+            to_drop = [name for name in original_source_names if name in ds.variables and name not in final_var_names]
+            if to_drop:
+                ds = ds.drop_vars(to_drop)
+
+        ds = self._drop_placeholder_coords(ds, coords, target_coords)
 
         return ds
 
