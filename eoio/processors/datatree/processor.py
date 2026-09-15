@@ -181,6 +181,8 @@ def build_datatree(
     tree_dict: Dict[str, xr.Dataset] = {"/": root_ds}
     for grid_id, var_names in sorted(groups.items()):
         node_ds = ds[var_names]
+        node_ds.attrs = dict(node_ds.attrs)  # independent copy -- see _rescope_per_band_attrs
+        node_ds = _rescope_per_band_attrs(ds, node_ds, var_names)
         if rename_dims:
             node_ds = _rename_grid_dims(node_ds, grid_id)
         if rename_vars:
@@ -188,6 +190,59 @@ def build_datatree(
         tree_dict[f"/{grid_id}"] = node_ds
 
     return xr.DataTree.from_dict(tree_dict)
+
+
+#: Dataset-level attrs that :func:`eoio.readers.metadata.BaseMetadataExtractor.extract_metadata`
+#: sets once per product, as one list entry per originally-selected measurement band (see
+#: its own docstring) -- i.e. scoped to the *whole, still-flat* dataset, not to any one
+#: grid. ``node_ds = ds[var_names]`` above inherits ``ds.attrs`` wholesale (xarray's own
+#: dataset-subsetting doesn't know these particular attrs are per-band), so left alone
+#: every split node would carry the same whole-product list regardless of which bands it
+#: actually holds. Maps each such dataset-level attr to the per-variable attr name that
+#: correctly describes a single variable (the same ``product_metadata`` source
+#: :func:`_detect_grid` already trusts for ``geometry_id``).
+_PER_VARIABLE_RESCOPED_ATTRS: Dict[str, str] = {
+    "spatial_resolution": "spatial_resolution",
+    "geometry_ids": "geometry_id",
+}
+
+
+def _rescope_per_band_attrs(ds: xr.Dataset, node_ds: xr.Dataset, var_names: List[str]) -> xr.Dataset:
+    """Recompute *node_ds*'s :py:data:`_PER_VARIABLE_RESCOPED_ATTRS` from *var_names*'
+    own per-variable metadata on *ds*, instead of leaving the whole-product value it
+    inherited via ``ds[var_names]``.
+
+    A value found on every one of *var_names* collapses to a single scalar (the normal
+    case -- one grid's worth of bands all share one resolution); several distinct values
+    are kept as a sorted list (only possible with a custom ``grid_attr`` that doesn't
+    correspond to spatial_resolution/geometry_id, since the real grid detection paths
+    guarantee a uniform resolution within one node). If no variable in *var_names* carries
+    the per-variable attr at all, the stale whole-product value is dropped rather than
+    propagated -- a missing attr is honest; a wrong one is not.
+
+    :param ds: the original, still-flat dataset (looked up by *var_names*' original names).
+    :param node_ds: *ds*'s subset for this grid -- **mutated in place** (its ``attrs``
+        must already be an independent dict, not shared with *ds* or another node).
+    :param var_names: this node's own variable names, in *ds*.
+    :return: *node_ds*.
+    """
+    for dataset_attr, variable_attr in _PER_VARIABLE_RESCOPED_ATTRS.items():
+        if dataset_attr not in node_ds.attrs:
+            continue
+        values = []
+        for name in var_names:
+            da = ds[name]
+            val = _get_nested_attr(da, f"product_metadata.{variable_attr}")
+            if val is None:
+                val = da.attrs.get(variable_attr)
+            if val is not None:
+                values.append(val)
+        if not values:
+            del node_ds.attrs[dataset_attr]
+            continue
+        unique = sorted({v for v in values}, key=str)
+        node_ds.attrs[dataset_attr] = unique[0] if len(unique) == 1 else unique
+    return node_ds
 
 
 @register_processor("from_datatree")
