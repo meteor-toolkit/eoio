@@ -78,12 +78,15 @@ class TestLandsatLayout(unittest.TestCase):
             json = layout.product_metadata_json()
             self.assertTrue(json.name.endswith("STAC.json"))
 
-    def test_product_metadata_json_RaisesIfJsonMissing(self):
+    def test_product_metadata_json_ReturnsNoneAndWarnsIfJsonMissing(self):
+        """Missing, not raised: LSMetadataExtractor falls back to MTL.xml + raster metadata
+        for everything this file would otherwise supply -- see ls_mtd_fallback."""
         with TemporaryDirectory() as td:
             p = self._make_landsat(Path(td), with_stac_json=False)
             layout = LandsatLayout(str(p))
-            with self.assertRaises(LandsatLayoutError):
-                layout.product_metadata_json()
+            with self.assertWarns(Warning):
+                result = layout.product_metadata_json()
+            self.assertIsNone(result)
 
     def test_available_band_tokens_ReturnsTokens(self):
         with TemporaryDirectory() as td:

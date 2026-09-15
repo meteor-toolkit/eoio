@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 import glob
 import os
+import warnings
 
 
 class LandsatLayoutError(ValueError):
@@ -57,9 +58,22 @@ class LandsatLayout:
 
     def product_metadata_json(self) -> Optional[Path]:
         """
-        Return the product metadata JSON file for the Landsat product (STAC preferred).
+        Return the product metadata JSON file for the Landsat product (STAC preferred), or
+        ``None`` if the product doesn't have one.
 
-        :return: Path to the product metadata JSON file, if it exists.
+        Missing rather than raising: every value this file supplies (per-band GSD/central
+        wavelength, EPSG, proj:shape/proj:transform) has an equivalent source elsewhere --
+        MTL.xml's own GRID_CELL_SIZE_* fields, fixed OLI/TIRS instrument-spec band centres,
+        and the product's own GeoTIFF band files' raster metadata respectively -- see
+        :py:mod:`eoio.readers.landsat.metadata.ls_mtd_fallback`, which
+        :py:class:`eoio.readers.landsat.metadata.extractor.LSMetadataExtractor` falls back to
+        when this returns ``None``. In practice this file is usually genuinely present in a
+        USGS Collection 2 Level-1 delivery; its absence more often means an interrupted local
+        extraction left some archive members missing (see
+        :py:func:`eoio.utils.read_utils._extraction_is_complete`, which now detects and heals
+        that) than a real product-format difference.
+
+        :return: Path to the product metadata JSON file, or ``None`` if not found.
         """
         # Match both uppercase (*STAC.json, as on Windows) and lowercase (*stac.json,
         # as shipped by USGS) to stay portable across case-sensitive filesystems.
@@ -67,7 +81,11 @@ class LandsatLayout:
             os.path.join(self.product_dir, "*stac.json")
         )
         if not candidates:
-            raise LandsatLayoutError(f"No STAC product metadata JSON file found in: {self.product_dir}")
+            warnings.warn(
+                f"No STAC product metadata JSON file found in: {self.product_dir} -- falling back to "
+                "MTL.xml + raster metadata for band GSD/wavelength and projection info."
+            )
+            return None
         return Path(candidates[0])
 
     def available_band_tokens(self) -> Set[str]:

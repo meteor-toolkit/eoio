@@ -7,6 +7,7 @@ from __future__ import annotations
 from eoio.readers.metadata import BaseMetadataExtractor
 from eoio.readers.landsat.metadata.ls_mtd_xml import LSL1ProdXMLReader
 from eoio.readers.landsat.metadata.ls_mtd_json import LSL1ProdJSONReader
+from eoio.readers.landsat.metadata.ls_mtd_fallback import LSMTDFallbackReader
 from eoio.readers.footprint_utils import normalize_footprint
 
 MEAS_VAR_BAND_IDS = {
@@ -46,8 +47,14 @@ class LSMetadataExtractor(BaseMetadataExtractor):
         # Find and initialize the XML reader
         self.xml_reader = LSL1ProdXMLReader(self.layout.product_metadata_xml())
 
-        # Find and initialize the JSON reader (STAC preferred)
-        self.json_reader = LSL1ProdJSONReader(self.layout.product_metadata_json())
+        # Find and initialize the JSON reader (STAC preferred) -- falling back to MTL.xml +
+        # raster metadata (see ls_mtd_fallback) if the product has no STAC/MTL JSON sidecar
+        # at all (layout.product_metadata_json() already warns in that case).
+        json_path = self.layout.product_metadata_json()
+        if json_path is not None:
+            self.json_reader = LSL1ProdJSONReader(json_path)
+        else:
+            self.json_reader = LSMTDFallbackReader(self.layout, self.xml_reader)
 
         # Cache JSON-derived band metadata to minimize repeated lookup
         self._band_wavelengths = self.json_reader.find_all_band_central_wavelengths()
