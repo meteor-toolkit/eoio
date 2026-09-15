@@ -1,12 +1,21 @@
 """eoio.utils.tests.test_read_utils - tests for eoio.utils.read_utils"""
 
 import io
+import os
+import tarfile
 import unittest
+import zipfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import xarray as xr
 
 from eoio.utils.read_utils import (
+    _archive_members,
+    _extraction_is_complete,
+    _extraction_root_for,
+    _remove_incomplete_extraction,
     clean_and_convert_attrs,
     convert_to_netcdf_compatible,
     extract_file,
@@ -93,10 +102,12 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.extract_zipped_file")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
     @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_s2(
         self,
         mock_path_exists,
+        mock_path_isfile,
         mock_is_tarfile,
         mock_is_zipfile,
         mock_extract_zipped_file,
@@ -104,6 +115,7 @@ class TestReadUtils(unittest.TestCase):
         mock_get_extension,
     ):
         mock_path_exists.return_value = False
+        mock_path_isfile.return_value = True
         mock_is_tarfile.return_value = False
         mock_is_zipfile.return_value = True
         mock_get_extension.return_value = ".SAFE"
@@ -123,10 +135,12 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.extract_zipped_file")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
     @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_s3(
         self,
         mock_path_exists,
+        mock_path_isfile,
         mock_is_tarfile,
         mock_is_zipfile,
         mock_extract_zipped_file,
@@ -134,6 +148,7 @@ class TestReadUtils(unittest.TestCase):
         mock_get_extension,
     ):
         mock_path_exists.return_value = False
+        mock_path_isfile.return_value = True
         mock_is_tarfile.return_value = False
         mock_is_zipfile.return_value = True
         mock_get_extension.return_value = ".SEN3"
@@ -158,10 +173,12 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.extract_zipped_file")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
     @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_zip(
         self,
         mock_path_exists,
+        mock_path_isfile,
         mock_is_tarfile,
         mock_is_zipfile,
         mock_extract_zipped_file,
@@ -169,6 +186,7 @@ class TestReadUtils(unittest.TestCase):
         mock_get_reader,
     ):
         mock_path_exists.return_value = False
+        mock_path_isfile.return_value = True
         mock_is_tarfile.return_value = False
         mock_is_zipfile.return_value = True
         mock_get_reader.return_value.get_extension.return_value = ""
@@ -185,10 +203,12 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.extract_zipped_file")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
     @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_tar(
         self,
         mock_path_exists,
+        mock_path_isfile,
         mock_is_tarfile,
         mock_is_zipfile,
         mock_extract_zipped_file,
@@ -196,6 +216,7 @@ class TestReadUtils(unittest.TestCase):
         mock_get_reader,
     ):
         mock_path_exists.return_value = False
+        mock_path_isfile.return_value = True
         mock_is_tarfile.return_value = True
         mock_is_zipfile.return_value = False
         mock_get_reader.return_value.get_extension.return_value = ""
@@ -212,10 +233,12 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.utils.read_utils.extract_zipped_file")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
     @patch("eoio.utils.read_utils.os.path.exists")
     def test_extract_file_tar_gz(
         self,
         mock_path_exists,
+        mock_path_isfile,
         mock_is_tarfile,
         mock_is_zipfile,
         mock_extract_zipped_file,
@@ -223,6 +246,7 @@ class TestReadUtils(unittest.TestCase):
         mock_get_reader,
     ):
         mock_path_exists.return_value = False
+        mock_path_isfile.return_value = True
         mock_is_tarfile.return_value = True
         mock_is_zipfile.return_value = False
         mock_get_reader.return_value.get_extension.return_value = ""
@@ -238,6 +262,7 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.readers.factory.ReaderFactory.get_reader")
     @patch("eoio.utils.read_utils.extract_tarred_file")
     @patch("eoio.utils.read_utils.extract_zipped_file")
+    @patch("eoio.utils.read_utils._extraction_is_complete")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
     @patch("eoio.utils.read_utils.os.path.exists")
@@ -246,6 +271,7 @@ class TestReadUtils(unittest.TestCase):
         mock_path_exists,
         mock_is_tarfile,
         mock_is_zipfile,
+        mock_extraction_is_complete,
         mock_extract_zipped_file,
         mock_extract_tarred_file,
         mock_get_reader,
@@ -253,6 +279,7 @@ class TestReadUtils(unittest.TestCase):
         mock_path_exists.return_value = True
         mock_is_tarfile.return_value = True
         mock_is_zipfile.return_value = True
+        mock_extraction_is_complete.return_value = True
         mock_get_reader.return_value.get_extension.return_value = ""
         mock_get_reader.return_value.default_read_params = {"save_extracted": False}
 
@@ -266,6 +293,7 @@ class TestReadUtils(unittest.TestCase):
     @patch("eoio.readers.factory.ReaderFactory.get_reader")
     @patch("eoio.utils.read_utils.extract_tarred_file")
     @patch("eoio.utils.read_utils.extract_zipped_file")
+    @patch("eoio.utils.read_utils._extraction_is_complete")
     @patch("eoio.utils.read_utils.zipfile.is_zipfile")
     @patch("eoio.utils.read_utils.tarfile.is_tarfile")
     @patch("eoio.utils.read_utils.os.path.exists")
@@ -274,6 +302,7 @@ class TestReadUtils(unittest.TestCase):
         mock_path_exists,
         mock_is_tarfile,
         mock_is_zipfile,
+        mock_extraction_is_complete,
         mock_extract_zipped_file,
         mock_extract_tarred_file,
         mock_get_reader,
@@ -290,6 +319,7 @@ class TestReadUtils(unittest.TestCase):
         mock_path_exists.return_value = True
         mock_is_tarfile.return_value = True
         mock_is_zipfile.return_value = True
+        mock_extraction_is_complete.return_value = True
         mock_get_reader.return_value.get_extension.return_value = ""
         mock_get_reader.return_value.default_read_params = {"metadata_level": "all"}
 
@@ -298,6 +328,45 @@ class TestReadUtils(unittest.TestCase):
         self.assertDictEqual(test_read_params, {"metadata_level": "all"})
         self.assertNotIn("save_extracted", test_read_params)
         self.assertFalse(test_extracted)
+
+    @patch("eoio.readers.factory.ReaderFactory.get_reader")
+    @patch("eoio.utils.read_utils.extract_tarred_file")
+    @patch("eoio.utils.read_utils.extract_zipped_file")
+    @patch("eoio.utils.read_utils._remove_incomplete_extraction")
+    @patch("eoio.utils.read_utils._extraction_is_complete")
+    @patch("eoio.utils.read_utils.zipfile.is_zipfile")
+    @patch("eoio.utils.read_utils.tarfile.is_tarfile")
+    @patch("eoio.utils.read_utils.os.path.isfile")
+    @patch("eoio.utils.read_utils.os.path.exists")
+    def test_extract_file_exists_but_incomplete_removes_and_reextracts(
+        self,
+        mock_path_exists,
+        mock_path_isfile,
+        mock_is_tarfile,
+        mock_is_zipfile,
+        mock_extraction_is_complete,
+        mock_remove_incomplete_extraction,
+        mock_extract_zipped_file,
+        mock_extract_tarred_file,
+        mock_get_reader,
+    ):
+        """A path_extracted that exists but doesn't match the archive (an interrupted
+        previous extraction) must be removed and re-extracted from scratch, not trusted."""
+        mock_path_exists.return_value = True
+        mock_path_isfile.return_value = True  # path is the real archive, not a directory
+        mock_is_tarfile.return_value = True
+        mock_is_zipfile.return_value = False
+        mock_extraction_is_complete.return_value = False
+        mock_get_reader.return_value.get_extension.return_value = ""
+
+        with self.assertWarns(Warning):
+            test_path, test_read_params, test_extracted = extract_file("path_string")
+
+        mock_remove_incomplete_extraction.assert_called_once_with("path_string", "path_string")
+        mock_extract_tarred_file.assert_called_once_with("path_string", "path_string")
+        mock_extract_zipped_file.assert_not_called()
+        self.assertEqual("path_string", test_path)
+        self.assertTrue(test_extracted)
 
     @patch("eoio.readers.factory.ReaderFactory.get_reader")
     @patch("eoio.utils.read_utils.extract_tarred_file")
@@ -437,6 +506,192 @@ class TestReadUtils(unittest.TestCase):
         mock_exists.assert_not_called()
         mock_makedirs.assert_not_called()
         mock_tarfile_open.assert_not_called()
+
+
+def _make_tar_gz(archive_path, files: dict) -> None:
+    """A real .tar.gz at archive_path containing files (relative_path -> content bytes),
+    flat (no product-folder prefix) -- mirroring Landsat's own .tar.gz layout, and how
+    extract_tarred_file's tar.extractall(path_extracted) resolves each member's own internal
+    path relative to path_extracted directly."""
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for rel_path, content in files.items():
+            data = content.encode() if isinstance(content, str) else content
+            info = tarfile.TarInfo(name=rel_path)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+
+
+def _make_zip(archive_path, files: dict) -> None:
+    """A real .zip at archive_path containing files (relative_path -> content bytes), flat
+    (no product-folder prefix) -- mirroring extract_zipped_file's own convention of
+    extracting a zip's members relative to the parent of path_extracted, not into a
+    path_extracted-named subdirectory."""
+    with zipfile.ZipFile(archive_path, "w") as zf:
+        for rel_path, content in files.items():
+            data = content.encode() if isinstance(content, str) else content
+            zf.writestr(rel_path, data)
+
+
+class TestExtractionCompleteness(unittest.TestCase):
+    """Real (unmocked) tar.gz/zip fixtures -- Landsat's own product format here is .tar.gz,
+    which (unlike zip) has no central directory index, so building its member list means a
+    full decompression pass; these tests exercise that real behaviour, not a mocked stand-in
+    for it."""
+
+    def setUp(self):
+        self._tmpdir = TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        self.tmp_path = Path(self._tmpdir.name)
+
+    def test_archive_members_lists_files_not_directories_tar(self):
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+        members = _archive_members(str(archive))
+
+        names = {name for name, _ in members}
+        self.assertEqual(names, {"B1.TIF", "B2.TIF"})
+        self.assertEqual(dict(members)["B1.TIF"], 4)
+        self.assertEqual(dict(members)["B2.TIF"], 8)
+
+    def test_archive_members_lists_files_not_directories_zip(self):
+        archive = self.tmp_path / "PRODUCT.zip"
+        _make_zip(archive, {"B1.TIF": b"aaaa", "sub/B2.TIF": b"bbbbbbbb"})
+
+        members = _archive_members(str(archive))
+
+        names = {name for name, _ in members}
+        self.assertEqual(names, {"B1.TIF", "sub/B2.TIF"})
+
+    def test_extraction_root_for_tar_is_path_extracted_itself(self):
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        _make_tar_gz(archive, {"B1.TIF": b"a"})
+        self.assertEqual(
+            _extraction_root_for(str(archive), str(self.tmp_path / "PRODUCT")), str(self.tmp_path / "PRODUCT")
+        )
+
+    def test_extraction_root_for_zip_is_the_parent_directory(self):
+        archive = self.tmp_path / "PRODUCT.zip"
+        _make_zip(archive, {"B1.TIF": b"a"})
+        self.assertEqual(_extraction_root_for(str(archive), str(self.tmp_path / "PRODUCT")), str(self.tmp_path))
+
+    def test_extraction_is_complete_true_for_a_real_full_extraction(self):
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        path_extracted = self.tmp_path / "PRODUCT"
+        _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+        extract_tarred_file(str(archive), str(path_extracted))
+
+        self.assertTrue(_extraction_is_complete(str(archive), str(path_extracted)))
+
+    def test_extraction_is_complete_false_when_a_member_is_missing(self):
+        """Simulates exactly what an interrupted extraction leaves behind: the directory
+        exists, some members made it, one didn't."""
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        path_extracted = self.tmp_path / "PRODUCT"
+        _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+        extract_tarred_file(str(archive), str(path_extracted))
+        os.remove(path_extracted / "B2.TIF")
+
+        self.assertFalse(_extraction_is_complete(str(archive), str(path_extracted)))
+
+    def test_extraction_is_complete_false_when_a_member_is_truncated(self):
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        path_extracted = self.tmp_path / "PRODUCT"
+        _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+        extract_tarred_file(str(archive), str(path_extracted))
+        (path_extracted / "B2.TIF").write_bytes(b"bb")  # shorter than the real 8 bytes
+
+        self.assertFalse(_extraction_is_complete(str(archive), str(path_extracted)))
+
+    def test_remove_incomplete_extraction_only_removes_archive_members(self):
+        """Must not touch a file that happens to live alongside the archive's own members but
+        isn't one of them -- a blanket directory wipe would risk deleting unrelated data."""
+        archive = self.tmp_path / "PRODUCT.tar.gz"
+        path_extracted = self.tmp_path / "PRODUCT"
+        _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+        extract_tarred_file(str(archive), str(path_extracted))
+        unrelated = path_extracted / "not_from_the_archive.txt"
+        unrelated.write_text("keep me")
+
+        _remove_incomplete_extraction(str(archive), str(path_extracted))
+
+        self.assertFalse((path_extracted / "B1.TIF").exists())
+        self.assertFalse((path_extracted / "B2.TIF").exists())
+        self.assertTrue(unrelated.exists())
+
+
+class TestExtractFileHealsRealInterruptedExtraction(unittest.TestCase):
+    """extract_file() end to end, real tar.gz fixture, no mocking -- simulates an
+    interrupted extraction (fully extract, then delete one file, as if the process had been
+    killed before writing it) and confirms extract_file() detects, heals, and re-reads it
+    correctly, not just that the lower-level completeness helpers do in isolation."""
+
+    @patch("eoio.utils.read_utils.ReaderFactory.get_reader")
+    def test_missing_member_is_healed_on_next_extract_file_call(self, mock_get_reader):
+        with TemporaryDirectory() as td:
+            tmp_path = Path(td)
+            archive = tmp_path / "PRODUCT.tar.gz"
+            path_extracted = tmp_path / "PRODUCT"
+            _make_tar_gz(archive, {"B1.TIF": b"aaaa", "B2.TIF": b"bbbbbbbb"})
+
+            mock_get_reader.return_value.get_extension.return_value = ""
+            mock_get_reader.return_value.default_read_params = {"save_extracted": True}
+
+            # first call: nothing extracted yet -> extracts fully
+            first_path, _, first_extracted = extract_file(str(archive))
+            self.assertTrue(first_extracted)
+            self.assertTrue((path_extracted / "B1.TIF").exists())
+            self.assertTrue((path_extracted / "B2.TIF").exists())
+
+            # simulate an interrupted extraction elsewhere having dropped a file
+            os.remove(path_extracted / "B2.TIF")
+
+            with self.assertWarns(Warning):
+                second_path, _, second_extracted = extract_file(str(archive))
+
+            self.assertEqual(second_path, first_path)
+            self.assertEqual(second_path, str(path_extracted))
+            self.assertTrue(second_extracted)  # re-extracted, not silently trusted
+            self.assertTrue((path_extracted / "B1.TIF").exists())
+            self.assertTrue((path_extracted / "B2.TIF").exists())
+            self.assertEqual((path_extracted / "B2.TIF").read_bytes(), b"bbbbbbbb")  # healed, not left short
+
+
+class TestExtractFileCalledWithAnAlreadyExtractedDirectory(unittest.TestCase):
+    """Regression test: for a reader whose get_extension() is "" (e.g. Landsat),
+    path_extracted equals path itself once a product is already fully extracted -- so a
+    caller passing that same already-resolved product directory back in as path (a real,
+    already-observed call pattern, not hypothetical) must not make extract_file() try to
+    open that directory as an archive. It briefly did: is_archive's tarfile.is_tarfile(path)
+    was being called unconditionally, and unlike zipfile.is_zipfile (which safely returns
+    False for a directory), tarfile.is_tarfile raises IsADirectoryError rather than
+    returning False -- so this crashed instead of just passing the directory through."""
+
+    @patch("eoio.utils.read_utils.ReaderFactory.get_reader")
+    def test_reextracted_directory_path_is_passed_through_without_raising(self, mock_get_reader):
+        with TemporaryDirectory() as td:
+            tmp_path = Path(td)
+            archive = tmp_path / "PRODUCT.tar.gz"
+            path_extracted = tmp_path / "PRODUCT"
+            _make_tar_gz(archive, {"B1.TIF": b"aaaa"})
+
+            mock_get_reader.return_value.get_extension.return_value = ""
+            mock_get_reader.return_value.default_read_params = {"save_extracted": True}
+
+            first_path, _, first_extracted = extract_file(str(archive))
+            self.assertTrue(first_extracted)
+            self.assertEqual(first_path, str(path_extracted))
+
+            # second call: path is now the already-extracted directory itself, not the archive
+            second_path, second_read_params, second_extracted = extract_file(first_path, {})
+
+            self.assertEqual(second_path, str(path_extracted))
+            self.assertFalse(second_extracted)  # trusted as already complete, not re-extracted
+            self.assertTrue(second_read_params.get("save_extracted"))
 
 
 class TestCleanAndConvertAttrs(unittest.TestCase):

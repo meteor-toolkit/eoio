@@ -166,5 +166,32 @@ class TestLSMetadataExtractor(unittest.TestCase):
         self.assertEqual(ds.attrs["product_metadata"]["prod"], "info")
 
 
+class TestLSMetadataExtractorFallsBackWithoutStacJson(unittest.TestCase):
+    """LSMetadataExtractor must use LSMTDFallbackReader (not LSL1ProdJSONReader) when the
+    product's layout reports no STAC/MTL JSON sidecar -- layout.product_metadata_json()
+    returning None, as it now does instead of raising (see LandsatLayout)."""
+
+    @patch("eoio.readers.landsat.metadata.extractor.LSMTDFallbackReader")
+    @patch("eoio.readers.landsat.metadata.extractor.LSL1ProdJSONReader")
+    @patch("eoio.readers.landsat.metadata.extractor.LSL1ProdXMLReader")
+    def test_uses_the_fallback_reader_not_the_json_reader(
+        self, mock_xml_reader_cls, mock_json_reader_cls, mock_fallback_reader_cls
+    ):
+        reader = MagicMock()
+        reader.config.subset = {}
+        reader.layout.product_metadata_json.return_value = None  # no STAC/MTL JSON sidecar
+
+        mock_fallback_instance = MagicMock()
+        mock_fallback_instance.find_all_band_central_wavelengths.return_value = {}
+        mock_fallback_instance.find_all_band_gsds.return_value = {}
+        mock_fallback_reader_cls.return_value = mock_fallback_instance
+
+        extractor = LSMetadataExtractor(reader)
+
+        mock_json_reader_cls.assert_not_called()
+        mock_fallback_reader_cls.assert_called_once_with(reader.layout, mock_xml_reader_cls.return_value)
+        self.assertIs(extractor.json_reader, mock_fallback_instance)
+
+
 if __name__ == "__main__":
     unittest.main()
