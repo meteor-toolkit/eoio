@@ -10,6 +10,7 @@ from eoio.processors.datatree.processor import (
     _grid_suffix_from_dims,
     _rename_grid_dims,
     _rename_grid_vars,
+    _rescope_per_band_attrs,
     _restore_grid_vars,
     build_datatree,
     from_datatree,
@@ -21,14 +22,39 @@ from eoio.processors.datatree.processor import (
 # ---------------------------------------------------------------------------
 
 
-def _da(dims, grid_id=None, extra_attrs=None):
+def _da(dims, grid_id=None, spatial_resolution=None, extra_attrs=None):
     shape = tuple(4 for _ in dims)
     attrs = {}
-    if grid_id is not None:
-        attrs["product_metadata"] = {"geometry_id": grid_id}
+    if grid_id is not None or spatial_resolution is not None:
+        pm = {}
+        if grid_id is not None:
+            pm["geometry_id"] = grid_id
+        if spatial_resolution is not None:
+            pm["spatial_resolution"] = spatial_resolution
+        attrs["product_metadata"] = pm
     if extra_attrs:
         attrs.update(extra_attrs)
     return xr.DataArray(np.ones(shape, dtype="float32"), dims=dims, attrs=attrs)
+
+
+@pytest.fixture()
+def s2_like_ds_whole_product_spatial_resolution():
+    """Same shape as ``s2_like_ds``, but also carries the two real-world symptoms of a
+    bug this module guards against: a dataset-level ``spatial_resolution``/
+    ``geometry_ids`` attr set once for the *whole, still-flat* product -- one entry per
+    originally-read band (B01's 60 m included), in read order, covering every eventual
+    grid -- exactly as ``eoio.readers.metadata.extract_metadata`` builds it, before any
+    split by grid. Each variable also carries its own correct per-variable
+    ``product_metadata.spatial_resolution``, mirroring ``geometry_id``."""
+    ds = xr.Dataset()
+    ds["B02"] = _da(("y_10m", "x_10m"), grid_id="10m", spatial_resolution=10)
+    ds["B03"] = _da(("y_10m", "x_10m"), grid_id="10m", spatial_resolution=10)
+    ds["B05"] = _da(("y_20m", "x_20m"), grid_id="20m", spatial_resolution=20)
+    ds["B06"] = _da(("y_20m", "x_20m"), grid_id="20m", spatial_resolution=20)
+    ds["B01"] = _da(("y_60m", "x_60m"), grid_id="60m", spatial_resolution=60)
+    ds.attrs["spatial_resolution"] = [60, 10, 10, 20, 20]
+    ds.attrs["geometry_ids"] = ["60m", "10m", "10m", "20m", "20m"]
+    return ds
 
 
 @pytest.fixture()
@@ -310,6 +336,69 @@ class TestBuildDataTree:
         for var in node_10m.data_vars.values():
             assert "x_20m" not in var.dims
             assert "x_60m" not in var.dims
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — _rescope_per_band_attrs / build_datatree's use of it
+# ---------------------------------------------------------------------------
+
+
+class TestRescopePerBandAttrs:
+    """Regression coverage for a real failure: ``spatial_resolution``/``geometry_ids``
+    are set once, whole-product, as one list entry per originally-read band -- before
+    ``build_datatree`` splits by grid. Left alone, every split node inherited the same
+    whole-product list regardless of which bands it actually held (e.g. a real
+    Sentinel-2 "10m" node came through with ``spatial_resolution=[60, 10, 10, 10, 20,
+    20, 20]``, B01's 60 m included even though B01 lives on a different node)."""
+
+    def test_each_node_gets_its_own_scalar_spatial_resolution(self, s2_like_ds_whole_product_spatial_resolution):
+        dt = build_datatree(s2_like_ds_whole_product_spatial_resolution)
+        assert dt["10m"].dataset.attrs["spatial_resolution"] == 10
+        assert dt["20m"].dataset.attrs["spatial_resolution"] == 20
+        assert dt["60m"].dataset.attrs["spatial_resolution"] == 60
+
+    def test_each_node_gets_its_own_geometry_ids(self, s2_like_ds_whole_product_spatial_resolution):
+        dt = build_datatree(s2_like_ds_whole_product_spatial_resolution)
+        assert dt["10m"].dataset.attrs["geometry_ids"] == "10m"
+        assert dt["20m"].dataset.attrs["geometry_ids"] == "20m"
+        assert dt["60m"].dataset.attrs["geometry_ids"] == "60m"
+
+    def test_mutating_one_nodes_attrs_does_not_leak_to_another(self, s2_like_ds_whole_product_spatial_resolution):
+        dt = build_datatree(s2_like_ds_whole_product_spatial_resolution)
+        dt["10m"].dataset.attrs["spatial_resolution"] = 999
+        assert dt["20m"].dataset.attrs["spatial_resolution"] == 20
+        assert dt["60m"].dataset.attrs["spatial_resolution"] == 60
+
+    def test_root_attrs_left_as_the_whole_product_summary(self, s2_like_ds_whole_product_spatial_resolution):
+        """Root holds no single grid, so its whole-product summary is legitimate as-is --
+        only per-grid child nodes are rescoped."""
+        dt = build_datatree(s2_like_ds_whole_product_spatial_resolution)
+        assert dt.root.dataset.attrs["spatial_resolution"] == [60, 10, 10, 20, 20]
+        assert dt.root.dataset.attrs["geometry_ids"] == ["60m", "10m", "10m", "20m", "20m"]
+
+    def test_drops_stale_attr_when_no_per_variable_source(self):
+        """A node whose own variables carry no per-variable spatial_resolution/
+        geometry_id at all has the inherited whole-product value dropped, not kept --
+        a missing attr is honest, a wrong one is not."""
+        ds = xr.Dataset()
+        ds["B02"] = xr.DataArray(np.ones((4, 4), dtype="float32"), dims=("y_10m", "x_10m"))
+        ds.attrs["spatial_resolution"] = [60, 10, 10, 20, 20]
+        dt = build_datatree(ds)
+        assert "spatial_resolution" not in dt["10m"].dataset.attrs
+
+    def test_noop_when_attr_not_present(self, s2_like_ds):
+        """s2_like_ds carries no dataset-level spatial_resolution/geometry_ids at all --
+        confirms the common case (nothing to rescope) is a clean no-op."""
+        dt = build_datatree(s2_like_ds)
+        assert "spatial_resolution" not in dt["10m"].dataset.attrs
+
+    def test_helper_called_directly(self):
+        ds = xr.Dataset()
+        ds["B02"] = _da(("y_10m", "x_10m"), grid_id="10m", spatial_resolution=10)
+        node_ds = ds[["B02"]]
+        node_ds.attrs = dict(spatial_resolution=[60, 10])
+        out = _rescope_per_band_attrs(ds, node_ds, ["B02"])
+        assert out.attrs["spatial_resolution"] == 10
 
 
 # ---------------------------------------------------------------------------
