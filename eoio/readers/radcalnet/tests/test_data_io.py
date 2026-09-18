@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import numpy as np
 import xarray as xr
-from eoio.readers.radcalnet.data_io import read_dataset, read_file
+from eoio.readers.radcalnet.data_io import VARIABLE_ATTRS, _uncertainty_attrs, read_dataset, read_file
 
 
 class DummySubset:
@@ -157,6 +157,86 @@ class testReadFile(unittest.TestCase):
         self.assertEqual(ds.attrs["Lattitude"], -23.59999)
         self.assertEqual(ds.attrs["Longitude"], 15.119215)
         self.assertEqual(ds.attrs["Altitude"], 510.0)
+
+
+class TestReflectanceUncertaintyIsAnObsarrayComponent(unittest.TestCase):
+    """reflectance_uncertainty must be registered as a proper obsarray uncertainty
+    component of reflectance (ds.unc[...]), not just a plain, same-shaped sibling
+    data_var -- eoalign's uncertainty-detection utilities rely on this registration
+    (ds.unc.unc_vars) to recognise and skip it rather than processing it as if it were
+    ordinary data (see eoalign.utils.uncertainty)."""
+
+    def setUp(self):
+        fd, self.path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(fd, "w") as f:
+            f.write(_RADCALNET_FIXTURE)
+
+    def tearDown(self):
+        os.remove(self.path)
+
+    def test_reflectance_uncertainty_is_a_registered_unc_var(self):
+        ds = read_file(self.path, aux_vars=[])
+        self.assertIn("reflectance_uncertainty", ds.unc.unc_vars)
+        self.assertIn("reflectance", ds.unc.obs_vars)
+        self.assertEqual(ds["reflectance"].attrs["unc_comps"], "reflectance_uncertainty")
+
+    def test_reflectance_uncertainty_values_are_unchanged(self):
+        # _RADCALNET_FIXTURE's single "559" wavelength row has reflectance 0.1,
+        # uncertainty 0.01, at every one of its 13 time samples.
+        ds = read_file(self.path, aux_vars=[])
+        self.assertTrue(np.allclose(ds["reflectance_uncertainty"].values, 0.01))
+
+    def test_reflectance_uncertainty_has_err_corr_metadata(self):
+        ds = read_file(self.path, aux_vars=[])
+        attrs = ds["reflectance_uncertainty"].attrs
+        # wavelength block: "systematic" (fully correlated) -- matches s2radval's own
+        # documented assumption when combining these across a sensor SRF.
+        self.assertEqual(attrs["err_corr_1_dim"], ["wavelength"])
+        self.assertEqual(attrs["err_corr_1_form"], "systematic")
+        # time block: "random" (independent atmospheric retrieval per time sample).
+        self.assertEqual(attrs["err_corr_2_dim"], ["time"])
+        self.assertEqual(attrs["err_corr_2_form"], "random")
+
+    def test_aux_uncertainty_is_a_registered_unc_var(self):
+        # _RADCALNET_FIXTURE has no aux (P/T/...) rows -- build one with a "P" (air
+        # pressure) row plus its repeated-key uncertainty row, matching how reflectance's
+        # own value/uncertainty pair is written.
+        fixture = _RADCALNET_FIXTURE + "\nP\t" + "\t".join(["1013.0"] * 13) + "\nP\t" + "\t".join(["1.0"] * 13)
+        fd, path = tempfile.mkstemp(suffix=".txt")
+        with os.fdopen(fd, "w") as f:
+            f.write(fixture)
+        self.addCleanup(os.remove, path)
+
+        ds = read_file(path, aux_vars=["air_pressure"])
+        self.assertIn("air_pressure_uncertainty", ds.unc.unc_vars)
+        self.assertEqual(ds["air_pressure"].attrs["unc_comps"], "air_pressure_uncertainty")
+        self.assertEqual(ds["air_pressure_uncertainty"].attrs["err_corr_1_dim"], ["time"])
+        self.assertEqual(ds["air_pressure_uncertainty"].attrs["err_corr_1_form"], "random")
+
+
+class TestVariableAttrsHaveStandardName(unittest.TestCase):
+    """Regression test: several VARIABLE_ATTRS entries (water_vapour, ozone,
+    aerosol_optical_depth, aerosol_type, earth_sun_distance, local_time,
+    reflectance_uncertainty) used to have no standard_name at all, which
+    BaseMetadataExtractor.get_variable_basic_metadata warns about on every read since it
+    treats standard_name as a required basic-metadata key -- see
+    eoio.readers.radcalnet.tests.test_reader.testVariableNamingAndAttrs for the
+    end-to-end, warning-free assertion."""
+
+    def test_every_variable_attrs_entry_has_a_standard_name(self):
+        # "reflectance" is the one deliberate exception: its standard_name is
+        # TOA-/BOA-specific and set dynamically by the reader (see VARIABLE_ATTRS'
+        # own comment), not present in this static dict.
+        for name, attrs in VARIABLE_ATTRS.items():
+            if name == "reflectance":
+                continue
+            self.assertIn("standard_name", attrs, f"{name!r} has no standard_name")
+            self.assertTrue(attrs["standard_name"], f"{name!r} has an empty standard_name")
+
+    def test_uncertainty_attrs_has_a_standard_name(self):
+        for base_name in ("air_pressure", "water_vapour", "ozone"):
+            attrs = _uncertainty_attrs(base_name)
+            self.assertEqual(attrs["standard_name"], f"{base_name}_uncertainty")
 
 
 if __name__ == "__main__":
