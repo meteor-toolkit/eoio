@@ -27,6 +27,12 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
             return element.text.strip()
         return None
 
+    def _float_or_none(self, value):
+        try:
+            return float(value)
+        except ValueError:
+            return None
+
     def _resolution_m(self):
 
         variant = self._text(
@@ -40,25 +46,25 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
 
         root = self._root()
 
-        west = float(
+        west = self._float_or_none(
             self._text(
                 root,
                 ".//gmd:westBoundLongitude/gco:Decimal",
             )
         )
-        east = float(
+        east = self._float_or_none(
             self._text(
                 root,
                 ".//gmd:eastBoundLongitude/gco:Decimal",
             )
         )
-        south = float(
+        south = self._float_or_none(
             self._text(
                 root,
                 ".//gmd:southBoundLatitude/gco:Decimal",
             )
         )
-        north = float(
+        north = self._float_or_none(
             self._text(
                 root,
                 ".//gmd:northBoundLatitude/gco:Decimal",
@@ -159,25 +165,25 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
                     root,
                     ".//tsxx:imageDataType",
                 ),
-                "mean_elevation_m": float(
+                "mean_elevation_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:productStatistics/tsxx:meanValue",
                     )
                 ),
-                "min_elevation_m": float(
+                "min_elevation_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:productStatistics/tsxx:minValue",
                     )
                 ),
-                "max_elevation_m": float(
+                "max_elevation_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:productStatistics/tsxx:maxValue",
                     )
                 ),
-                "stddev_elevation_m": float(
+                "stddev_elevation_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:productStatistics/tsxx:stdDev",
@@ -189,13 +195,13 @@ class CopernicusDEMMetadataExtractor(BaseMetadataExtractor):
                         ".//tsxx:nrValidPixels",
                     )
                 ),
-                "le68_m": float(
+                "le68_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:absolutePositionalAccuracyLE68",
                     )
                 ),
-                "le90_m": float(
+                "le90_m": self._float_or_none(
                     self._text(
                         root,
                         ".//tsxx:absolutePositionalAccuracyLE90",
