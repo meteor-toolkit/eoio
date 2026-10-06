@@ -206,3 +206,45 @@ class TestReadTifIntoDataset(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReadTifBandSelection(unittest.TestCase):
+    """Real-file checks (a small synthetic tif) for which tif band each variable reads."""
+
+    def test_variable_reads_the_tif_band_named_by_it_not_its_position(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        import rasterio
+        from rasterio.transform import from_origin
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "20250108_092601_62_251b_3B_AnalyticMS_8b_clip.tif"
+            # band k holds the constant k+1, so the value identifies the band that was read
+            data = np.stack([np.full((4, 4), k + 1, dtype="uint16") for k in range(8)])
+            with rasterio.open(
+                path,
+                "w",
+                driver="GTiff",
+                height=4,
+                width=4,
+                count=8,
+                dtype="uint16",
+                crs="EPSG:32733",
+                transform=from_origin(500000.0, 7000000.0, 3.0, 3.0),
+            ) as dst:
+                dst.write(data)
+
+            layout = MagicMock(name="layout")
+            layout.image_file = str(path)
+            mtd = MagicMock(name="mtd")
+            mtd.product_metadata = {"geospatial_bounds_crs": "EPSG:32733"}
+            mtd.variable_product_metadata.return_value = {"radiometric_scale_factor": 1.0}
+
+            ds = read_tif_into_dataset(ds=xr.Dataset(), layout=layout, meas=["B6", "B4", "B2"], subset=None, mtd=mtd)
+
+        self.assertEqual(float(ds["B6"].mean()), 6.0)
+        self.assertEqual(float(ds["B4"].mean()), 4.0)
+        self.assertEqual(float(ds["B2"].mean()), 2.0)
+        # no leftover scalar "band" coordinate (it would collide with the stacked "band" dim)
+        self.assertNotIn("band", ds.coords)

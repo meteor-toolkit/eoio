@@ -10,6 +10,7 @@ from eoio.readers.planetscope.data_io import read_tif_into_dataset
 from eoio.readers.planetscope.aux_data import read_aux
 from eoio.readers.planetscope.metadata import PlanetScopeMetadataExtractor
 from eoio.readers.planetscope.conventions import apply_conventions
+from eoio.readers.planetscope.masks import MASK_OPTIONS, add_masks
 from eoio.readers.subset.roi_subset import ROISubsetResolver, ResolvedROISubset
 from eoio.deps import lazy_rasterio
 
@@ -20,8 +21,8 @@ AUX_OPTIONS = []  # TODO - add
 
 # TODO - add observation geometry angles
 
-# MASK_OPTIONS - Available mask variable names
-MASK_OPTIONS = []  # TODO - add
+# MASK_OPTIONS (imported above) - Available mask variable names: the UDM2 layers, see
+# eoio.readers.planetscope.masks
 
 
 class PlanetScopeReaderError(ValueError):
@@ -148,6 +149,7 @@ class PlanetScopeReader(BaseRasterReader):
         # unpack config
         meas = self.resolved_config.vars_sel.get("meas", None)
         aux = self.resolved_config.vars_sel.get("aux", None)
+        mask = self.resolved_config.vars_sel.get("mask", None)
         roi_subset = self.resolved_config.subset
         rp = self.resolved_config.read_params
         mtd_level = rp.get("metadata_level", None)
@@ -175,6 +177,16 @@ class PlanetScopeReader(BaseRasterReader):
         # add aux data if requested
         if aux:
             ds = read_aux(ds=ds, aux=aux, mtd=self.mtd)
+
+        # add mask data (UDM2) if requested
+        if mask:
+            ds = add_masks(
+                ds=ds,
+                masks=self.list_selected_mask() if isinstance(mask, str) else mask,
+                layout=self.layout,
+                subset=roi_subset,
+                config=self.resolved_config,
+            )
 
         ds = apply_conventions(ds, layout=self.layout, roi_subset=roi_subset, config=self.resolved_config)
 

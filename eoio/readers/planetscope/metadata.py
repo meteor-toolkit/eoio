@@ -170,9 +170,11 @@ class PlanetScopeMetadataExtractor(BaseMetadataExtractor):
                 var_md = {
                     "band_id": var,
                     "band_name": band_rel_dict[var],
-                    "band_central_wavelength": band_metadata_list[i]["center_wavelength"],
+                    # STAC eo:bands gives wavelengths in micrometres; reported here in nm
+                    # like every other eoio reader (round: 0.442 * 1000 is 442.00000000000006)
+                    "band_central_wavelength": round(float(band_metadata_list[i]["center_wavelength"]) * 1000, 6),
                     "band_central_wavelength_units": "nm",
-                    "band_full_width_half_max": band_metadata_list[i]["full_width_half_max"],
+                    "band_full_width_half_max": round(float(band_metadata_list[i]["full_width_half_max"]) * 1000, 6),
                     "standard_name": "toa_radiance",
                     "long_name": "TOA radiance",
                     "units": "W/( m² * sr * μm)",

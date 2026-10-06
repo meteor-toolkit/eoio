@@ -252,6 +252,14 @@ class TestPlanetScopeMetadataExtractor(unittest.TestCase):
         self.assertIn("units", metadata)
         self.assertIn("standard_name", metadata)
 
+    def test_variable_product_metadata_reports_wavelengths_in_nm(self) -> None:
+        """The STAC eo:bands wavelengths are micrometres; they must be reported in nm."""
+        extractor = PlanetScopeMetadataExtractor(self.reader)
+        metadata = extractor.get_variable_product_metadata("B1")
+        self.assertEqual(metadata["band_central_wavelength"], 442.0)
+        self.assertEqual(metadata["band_central_wavelength_units"], "nm")
+        self.assertEqual(metadata["band_full_width_half_max"], 21.0)
+
     def test_get_variable_product_metadata_returns_dict(self) -> None:
         """Test that get_variable_product_metadata returns a dictionary."""
         extractor = PlanetScopeMetadataExtractor(self.reader)
