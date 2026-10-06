@@ -2,7 +2,6 @@
 
 from typing import Any
 import warnings
-import numpy as np
 import xarray as xr
 from eoio.readers.planetscope.metadata import PlanetScopeMetadataExtractor
 
@@ -49,51 +48,28 @@ def add_angles(
     Add sun/view angle grids from PlanetScope metadata.
     """
     metadata = mtd.product_metadata
-    if "product_geospatial_bounds" in metadata.keys():  # for basic metadata
-        lon = np.nanmedian(
-            [
-                metadata["product_geospatial_bounds"][0],
-                metadata["product_geospatial_bounds"][2],
-            ]
-        )
-        lat = np.nanmedian(
-            [
-                metadata["product_geospatial_bounds"][1],
-                metadata["product_geospatial_bounds"][3],
-            ]
-        )
+    angle_attrs = mtd.get_angle_metadata()
     for src, dst in zip(
         ["sun_azimuth", "sun_elevation", "satellite_azimuth", "view_angle"],
         [
             "solar_azimuth_angle",
             "solar_zenith_angle",
-            "sensor_azimuth_angle",
-            "sensor_zenith_angle",
+            "viewing_azimuth_angle",
+            "viewing_zenith_angle",
         ],
     ):
+        angle = metadata["product_properties"][src]
         if dst == "solar_zenith_angle":
-            angle = 90 - metadata["product_properties"][src]
-        else:
-            angle = metadata["product_properties"][src]
-        ds[dst] = xr.DataArray(
-            np.array(angle).reshape((1, 1)),
-            {"y_3m_angles": np.array([0]), "x_3m_angles": np.array([0])},
-            ("y_3m_angles", "x_3m_angles"),
-        )
+            angle = 90 - angle
 
-        # add angle attrs from metadata
-        ds[f"{dst}"].attrs.update(mtd.get_angle_metadata()[f"{dst}"])
+        # One whole-scene value per angle, kept as a scalar (not a 1x1 grid of its own) so
+        # to_datatree puts it in the same node as the reflectance, where eoalign's
+        # brdf_correction looks for it. The nested product_metadata.geometry_id is what to_datatree
+        # (grid_attr) reads to do that placement, as a scalar has no x_3m/y_3m dims to infer it
+        # from. No "measurand" on purpose: the stack processor would merge all four into one
+        # ``angle`` variable.
+        attrs = {k: v for k, v in angle_attrs[dst].items() if k not in ("measurand", "geometry_id")}
+        attrs["product_metadata"] = {"geometry_id": "3m"}
+        ds[dst] = xr.DataArray(float(angle), attrs=attrs)
 
-    ds = ds.assign_coords(
-        {
-            "latitude_3m_angles": (
-                ["y_3m_angles", "x_3m_angles"],
-                np.array(lat).reshape(1, 1),
-            ),
-            "longitude_3m_angles": (
-                ["y_3m_angles", "x_3m_angles"],
-                np.array(lon).reshape(1, 1),
-            ),
-        }
-    )
     return ds

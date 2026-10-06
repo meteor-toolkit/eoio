@@ -110,14 +110,22 @@ class TestAddAngles(unittest.TestCase):
         result = add_angles(self.ds, self.mtd)
         self.assertIn("solar_zenith_angle", result)
         self.assertIn("solar_azimuth_angle", result)
-        self.assertIn("sensor_zenith_angle", result)
-        self.assertIn("sensor_azimuth_angle", result)
+        self.assertIn("viewing_zenith_angle", result)
+        self.assertIn("viewing_azimuth_angle", result)
 
-    def test_add_angles_adds_coordinates(self):
-        """Test that add_angles adds latitude coordinate."""
+    def test_add_angles_are_scalars_tagged_with_the_3m_grid(self):
+        """to_datatree needs the geometry_id to put these in the 3m node (not a node of their
+        own); brdf_correction needs them to broadcast over that node's pixels, so 0-d."""
+        self.mtd.get_angle_metadata.return_value = {
+            n: {"units": "degrees", "measurand": "angle", "geometry_id": "3m"}
+            for n in ("solar_zenith_angle", "solar_azimuth_angle", "viewing_zenith_angle", "viewing_azimuth_angle")
+        }
         result = add_angles(self.ds, self.mtd)
-        self.assertIn("latitude_3m_angles", result.coords)
-        self.assertIn("longitude_3m_angles", result.coords)
+        for name in ("solar_zenith_angle", "solar_azimuth_angle", "viewing_zenith_angle", "viewing_azimuth_angle"):
+            self.assertEqual(result[name].ndim, 0)
+            self.assertEqual(result[name].attrs["product_metadata"]["geometry_id"], "3m")
+            self.assertNotIn("measurand", result[name].attrs)
+        self.assertEqual(float(result["viewing_zenith_angle"]), 30.0)
 
     def test_add_angles_solar_zenith_conversion(self):
         """Test that solar_elevation is converted to solar_zenith_angle (90 - elevation)."""

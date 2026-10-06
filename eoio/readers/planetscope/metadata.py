@@ -264,7 +264,7 @@ class PlanetScopeMetadataExtractor(BaseMetadataExtractor):
                 "description": "Solar azimuth angle is the horizontal angle between the line of sight to the sun and a reference direction which is often due north. The angle is measured clockwise.",
                 "source_variable_name": "sun_azimuth",
             },
-            "sensor_zenith_angle": {
+            "viewing_zenith_angle": {
                 "units": "degrees",
                 "long_name": "Viewing Zenith Angle",
                 "standard_name": "sensor_zenith_angle",
@@ -275,7 +275,7 @@ class PlanetScopeMetadataExtractor(BaseMetadataExtractor):
                 "description": "Viewing zenith angle is the angle between the line of sight to the sensor and the local zenith at the observation target. This angle is measured starting from directly overhead and its range is from zero (directly overhead the observation target) to 180 degrees (directly below the observation target). Local zenith is a line perpendicular to the Earth's surface at a given location. 'Observation target' means a location on the Earth defined by the sensor performing the observations.",
                 "source_variable_name": "view_angle",
             },
-            "sensor_azimuth_angle": {
+            "viewing_azimuth_angle": {
                 "units": "degrees",
                 "long_name": "Viewing Azimuth Angle",
                 "standard_name": "sensor_azimuth_angle",
