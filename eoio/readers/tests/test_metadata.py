@@ -231,6 +231,21 @@ class TestBaseMetadataExtractor(unittest.TestCase):
         self.assertIn("date_created", out.attrs)
 
     @patch("eoio.readers.metadata.__version__", "9.9.9")
+    def test_attach_metadata_history_names_file_reader_and_version(self):
+        out = self.extractor.attach_metadata(xr.Dataset({"B02": xr.DataArray([1])}), level=None)
+
+        line = out.attrs["history"].split("\n")[-1]
+        self.assertTrue(line.endswith("TEST.SAFE read in using eoio version 9.9.9 (dummy reader)"), line)
+
+    def test_attach_metadata_appends_to_an_existing_history(self):
+        ds = xr.Dataset({"B02": xr.DataArray([1])}, attrs={"history": "earlier step"})
+        out = self.extractor.attach_metadata(ds, level=None)
+
+        lines = out.attrs["history"].split("\n")
+        self.assertEqual(lines[0], "earlier step")
+        self.assertEqual(len(lines), 2)
+
+    @patch("eoio.readers.metadata.__version__", "9.9.9")
     def test_attach_metadata_prefers_reader_supplied_license_references_date_created(self):
         """Regression test: license/references/date_created used to be unconditionally
         overwritten by attach_metadata() even when the reader's own get_basic_metadata()

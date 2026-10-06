@@ -173,13 +173,10 @@ class BaseMetadataExtractor(ABC):
         out.attrs.setdefault("references", "TBD")
 
         dt_now = dt.datetime.now(dt.timezone.utc).isoformat()
-        if "history" in out.attrs:
-            out.attrs["history"] = (
-                out.attrs["history"]
-                + f"\n{dt_now}: {os.path.split(self.path)[-1]} read in using eoio version {__version__}"
-            )
-        else:
-            out.attrs["history"] = f"{dt_now}: {os.path.split(self.path)[-1]} read in using eoio version {__version__}"
+        reader_name = out.attrs.get("eoio:reader")
+        via = f" ({reader_name} reader)" if reader_name else ""
+        entry = f"{dt_now}: {os.path.split(self.path)[-1]} read in using eoio version {__version__}{via}"
+        out.attrs["history"] = f"{out.attrs['history']}\n{entry}" if out.attrs.get("history") else entry
 
         return out
 
