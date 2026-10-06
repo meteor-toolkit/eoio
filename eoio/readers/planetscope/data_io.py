@@ -47,12 +47,20 @@ def read_tif_into_dataset(
     geometries = subset.geometries if subset else None
 
     for b, bnd in enumerate(meas):
+        # the tif band holding this variable, from its name ("B6" -> 6th band, index 5) -- not
+        # from its position in *meas*, which is only the same for a selection starting at B1
+        band_idx = int(bnd[1:]) - 1
+
+        # drop=True: a leftover scalar "band" coordinate would collide with the "band"
+        # dimension that the stack/to_datatree processors build later
         if geometries:
             var_bnd = (
-                rxr.open_rasterio(layout.image_file, chunks=chunks).isel(band=b).rio.clip(geometries, from_disk=True)
+                rxr.open_rasterio(layout.image_file, chunks=chunks)
+                .isel(band=band_idx, drop=True)
+                .rio.clip(geometries, from_disk=True)
             ).squeeze()
         else:
-            var_bnd = rxr.open_rasterio(layout.image_file, chunks=chunks).isel(band=b).squeeze()
+            var_bnd = rxr.open_rasterio(layout.image_file, chunks=chunks).isel(band=band_idx, drop=True).squeeze()
 
         if b == 0:
             lon_new, lat_new = convert_xy(
