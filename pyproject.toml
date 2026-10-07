@@ -38,8 +38,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "ruff",
-    "mypy",
+    # Pinned: both gate CI. Unpinned, a new release widens the gate under us --
+    # ruff 0.16 turned I001/PLR/RUF/BLE/DTZ on by default and reddened CI with
+    # 1670 findings on an unchanged tree. Bump deliberately, not incidentally.
+    "ruff==0.15.13",
+    "mypy==2.1.0",
     "pre-commit",
     "pytest",
     "pytest-html",
@@ -77,6 +80,9 @@ line-length = 120
 exclude = ["docs"]
 
 [tool.ruff.lint]
+# ruff's historical defaults, stated explicitly so a version bump cannot widen
+# the gate without someone choosing to.
+select = ["E4", "E7", "E9", "F"]
 extend-ignore = ["W291"]
 
 [tool.ruff.lint.per-file-ignores]
