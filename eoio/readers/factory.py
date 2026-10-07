@@ -46,8 +46,8 @@ class ReaderFactory:
         FLOX_pattern = re.compile(r".*.FLOX*.*")
         nc_pattern = re.compile(r".*.nc")
         esa_world_cover_pattern = re.compile(r"ESA_WorldCover.*.tif")
-        modis_terra_pattern = re.compile(r"MOD.*")
-        modis_aqua_pattern = re.compile(r"MOD.*")
+        modis_terra_pattern = re.compile(r"(?:^|[/\\])MOD\d+[^/\\]*$")
+        modis_aqua_pattern = re.compile(r"(?:^|[/\\])MYD\d+[^/\\]*$")
         copernicus_dem_pattern = re.compile(r".*Copernicus.*DEM.*")
         # > Check if input product_path matches any known product regular expressions
         #   return parsingFactory as appropriate
