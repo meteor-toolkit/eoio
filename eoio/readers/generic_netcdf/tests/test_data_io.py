@@ -23,7 +23,7 @@ class TestReadDataset(unittest.TestCase):
         self.assertNotIn("var2", result)
 
     def test_read_dataset_with_subset(self):
-        subset = GENERIC_NETCDFSubset(wavelength_indices=np.array([1]), datetime_indices=None, roi_subset=None)
+        subset = GENERIC_NETCDFSubset(wavelength_indices=np.array([1]))
         result = read_dataset(ds=self.ds, include_vars=["var2"], subset=subset)
         self.assertIn("var2", result)
         self.assertEqual(result["var2"].shape[0], 1)

@@ -13,6 +13,7 @@ grouping logic, so they live here and are imported back into
 
 from __future__ import annotations
 
+import json
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
@@ -44,10 +45,20 @@ def _get_nested_attr(obj: Union[xr.DataArray, xr.Dataset], attr_path: str) -> An
     ``"product_metadata.central_wavelength"`` returns
     ``obj.attrs["product_metadata"]["central_wavelength"]``.
 
+    A dict-valued step that has already been JSON-stringified (e.g. a reader
+    that serialised ``product_metadata`` to a netCDF-safe string before this
+    processor ran) is transparently parsed back into a dict before descending
+    further, so the lookup still succeeds either way.
+
     Returns ``None`` if any key in the path is missing.
     """
     val: Any = obj.attrs
     for key in attr_path.split("."):
+        if isinstance(val, str):
+            try:
+                val = json.loads(val)
+            except ValueError:
+                return None
         if not isinstance(val, dict):
             return None
         val = val.get(key)

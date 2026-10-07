@@ -56,7 +56,6 @@ User config example::
 
 from __future__ import annotations
 
-import json
 import warnings
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -398,48 +397,6 @@ def _get_coord_units(da: xr.DataArray, coord_attr_path: str) -> Optional[str]:
         if val is not None:
             return str(val)
     return None
-
-
-def _get_nested_attr(da: xr.DataArray, attr_path: str) -> Any:
-    """
-    Retrieve a variable attribute using dot-notation for nested dicts.
-
-    ``"central_wavelength"`` returns ``da.attrs["central_wavelength"]``.
-    ``"product_metadata.central_wavelength"`` returns
-    ``da.attrs["product_metadata"]["central_wavelength"]``.
-
-    A dict-valued step that has already been JSON-stringified (e.g. a reader
-    that serialised ``product_metadata`` to a netCDF-safe string before this
-    processor ran) is transparently parsed back into a dict before descending
-    further, so the lookup still succeeds either way.
-
-    Returns ``None`` if any key in the path is missing.
-    """
-    val: Any = da.attrs
-    for key in attr_path.split("."):
-        if isinstance(val, str):
-            try:
-                val = json.loads(val)
-            except ValueError:
-                return None
-        if not isinstance(val, dict):
-            return None
-        val = val.get(key)
-        if val is None:
-            return None
-    return val
-
-
-def _obs_concat(arrays: List[xr.DataArray], dim: str) -> xr.DataArray:
-    """
-    Concatenate DataArrays along ``dim`` using the obsarray interface.
-
-    Currently delegates to ``xr.concat``. When ``obsarray.concat`` is
-    available this function will be updated to use it, enabling
-    uncertainty-aware concatenation that propagates associated uncertainty
-    variables and metadata automatically.
-    """
-    return xr.concat(arrays, dim=dim)
 
 
 def _stack_dim_name(stack_dim: str, dims: Tuple[str, ...]) -> str:

@@ -98,7 +98,7 @@ class CopernicusDEMReader(BaseRasterReader):
 
         roi_crs = subset.get("roi_crs")
 
-        metadata_files = getattr(self.layout, "metadata_files", lambda: [])()
+        metadata_files: list[Any] = getattr(self.layout, "metadata_files", lambda: [])()
 
         if not metadata_files:
             rio = lazy_rasterio()

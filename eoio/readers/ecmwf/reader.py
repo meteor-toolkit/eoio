@@ -26,7 +26,7 @@ from eoio.deps import lazy_rioxarray
 # from eoio.readers.hypernets.aux import maybe_add_aux
 from eoio.readers.generic_netcdf.metadata import GenericNetCDFMetadataExtractor
 from eoio.readers.generic_netcdf.reader import NetCDFReader
-from eoio.readers.generic_netcdf.subset import build_subset
+from eoio.readers.ecmwf.subset import build_subset
 
 
 class ECMWFReader(NetCDFReader):
@@ -75,7 +75,7 @@ class ECMWFReader(NetCDFReader):
             "all": list(ds.variables),
         }
 
-        rio = lazy_rioxarray()
+        lazy_rioxarray()  # registers the .rio accessor used below
         image_crs = str(ds.rio.crs)
         if image_crs is None or image_crs == "None":
             ds = ds.rio.write_crs("EPSG:4326")
