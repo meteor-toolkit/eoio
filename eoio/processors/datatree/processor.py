@@ -350,21 +350,30 @@ def _rename_grid_vars(ds: xr.Dataset, grid_id: str) -> xr.Dataset:
     """
     Strip the grid suffix from variable and non-spatial coordinate names.
 
-    Only names that end with ``_{grid_id}`` are renamed. Spatial dimensions
-    (``x``, ``y``, ``x_<grid>``, ``y_<grid>``) are excluded since
-    :func:`_rename_grid_dims` handles those.
+    Names ending with ``_{grid_id}`` have the suffix dropped outright. Names
+    carrying the suffix as a mid-string segment (e.g. the ``stack`` processor's
+    ``<dim>_<grid>_name`` auxiliary coordinate, which names the stacking
+    dimension it annotates rather than a grid-suffixed measurand) have that
+    segment collapsed instead, so the coordinate keeps tracking its
+    now-renamed dimension. Spatial dimensions (``x``, ``y``, ``x_<grid>``,
+    ``y_<grid>``) are excluded since :func:`_rename_grid_dims` handles those.
 
-    E.g. for ``grid_id="10m"``:
-    ``reflectance_10m`` → ``reflectance``, ``band_10m`` → ``band``.
+    E.g. for ``grid_id="10m"``: ``reflectance_10m`` → ``reflectance``,
+    ``band_10m`` → ``band``, ``band_10m_name`` → ``band_name``.
     """
     suffix = f"_{grid_id}"
+    mid_segment = f"{suffix}_"
     spatial = {"x", "y", f"x_{grid_id}", f"y_{grid_id}"}
 
-    var_rename: Dict[str, str] = {
-        str(name): str(name)[: -len(suffix)]
-        for name in list(ds.data_vars) + list(ds.coords)
-        if str(name).endswith(suffix) and str(name) not in spatial
-    }
+    var_rename: Dict[str, str] = {}
+    for name in list(ds.data_vars) + list(ds.coords):
+        sname = str(name)
+        if sname in spatial:
+            continue
+        if sname.endswith(suffix):
+            var_rename[sname] = sname[: -len(suffix)]
+        elif mid_segment in sname:
+            var_rename[sname] = sname.replace(mid_segment, "_", 1)
     return ds.rename(var_rename) if var_rename else ds
 
 

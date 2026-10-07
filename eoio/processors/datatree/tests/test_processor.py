@@ -180,6 +180,22 @@ class TestRenameGridVars:
         result = _rename_grid_vars(ds, "10m")
         assert "B02" in result.data_vars
 
+    def test_strips_suffix_from_mid_string_name_coordinate(self):
+        # The "stack" processor's "<dim>_<grid>_name" auxiliary coordinate (e.g.
+        # "band_10m_name", naming the original per-band variables alongside the
+        # "band_10m" stacking dimension) carries the grid suffix as a mid-string
+        # segment, not a trailing one -- it must still collapse to "band_name" so
+        # it keeps tracking the "band_10m" -> "band" renamed dimension.
+        ds = xr.Dataset({"a": xr.DataArray(np.ones(3), dims=("band_10m",))})
+        ds = ds.assign_coords(band_10m=[492.7, 559.8, 664.6])
+        ds = ds.assign_coords(band_10m_name=("band_10m", ["B02", "B03", "B04"]))
+        result = _rename_grid_vars(ds, "10m")
+        assert "band" in result.coords
+        assert "band_name" in result.coords
+        assert "band_10m" not in result.coords
+        assert "band_10m_name" not in result.coords
+        assert list(result["band_name"].values) == ["B02", "B03", "B04"]
+
 
 class TestRestoreGridVars:
     def test_appends_suffix_to_data_vars(self):
@@ -307,6 +323,41 @@ class TestBuildDataTree:
         )
         dt = build_datatree(ds, rename_vars=False)
         assert "reflectance_10m" in dt["10m"].dataset.data_vars
+
+    def test_stack_then_build_datatree_keeps_name_coord_aligned_with_dim(self):
+        """End-to-end regression for the "stack" -> "to_datatree" pairing used by
+        multi-grid pipelines (e.g. Sentinel-2 RGB previews): the "stack" processor's
+        dim_coord_attr path leaves a "<dim>_<grid>_name" auxiliary coordinate (e.g.
+        "band_10m_name") naming each stacked variable's original band. Consumers find
+        the stacked variable's dim (post-rename, plain "band") and look up
+        "<dim>_name" ("band_name") to recover those original names -- this only works
+        if build_datatree renames the auxiliary coordinate in step with its dimension."""
+        from eoio.processors.stack.processor import StackCubes
+
+        ds = xr.Dataset()
+        for name, wl in [("B02", 492.7), ("B03", 559.8), ("B04", 664.6)]:
+            ds[name] = xr.DataArray(
+                np.ones((4, 4), dtype="float32"),
+                dims=("y_10m", "x_10m"),
+                attrs={
+                    "measurand": "reflectance",
+                    "product_metadata": {"geometry_id": "10m", "band_central_wavelength": wl},
+                },
+            )
+        stacked = StackCubes(
+            params={"stack_dim": "band", "dim_coord_attr": "product_metadata.band_central_wavelength"}
+        ).run(ds)
+        dt = build_datatree(stacked)
+
+        node_ds = dt["10m"].dataset
+        band_var = next(v for v in node_ds.data_vars if "band" in node_ds[v].dims)
+        band_dim = next(d for d in node_ds[band_var].dims if str(d).startswith("band"))
+        assert band_dim == "band"
+        assert f"{band_dim}_name" in node_ds.coords, (
+            f"expected a '{band_dim}_name' coordinate aligned with the renamed '{band_dim}' "
+            f"dimension, found coords: {list(node_ds.coords)}"
+        )
+        assert list(node_ds[f"{band_dim}_name"].values) == ["B02", "B03", "B04"]
 
     def test_variable_attrs_preserved_for_ungridded_data(self):
         """Point/time-series data (e.g. RadCalNet, Hypernets) has no x_/y_ spatial dims, so

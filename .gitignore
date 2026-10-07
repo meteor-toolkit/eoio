@@ -129,3 +129,5 @@ ENV/
 # Local test/scratch files
 examples/scratch/*
 *.png
+
+CLAUDE.md
