@@ -79,7 +79,6 @@ class ESAWorldCoverReader(BaseRasterReader):
 
         roi_subset = self.resolved_config.subset
 
-        ds = xr.open_dataset(self.path)
         ds = xr.Dataset()
 
         rp = self.resolved_config.read_params
