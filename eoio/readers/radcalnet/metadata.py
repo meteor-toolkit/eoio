@@ -129,13 +129,10 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
         name = self.ds.attrs["Site"][0:4]
         if name not in ROI_DEFINITIONS:
             warnings.warn(f"Site {name!r} has no known ROI definition; spatial_resolution will be left unset")
-        # This reader covers a time series of many observations, so there is no single
-        # instant to report -- product_datetime is intentionally omitted (unlike
-        # single-acquisition readers) since product_date only reflects the first timestamp.
         basic_md = {
             "collection_name": f"{name} {self.ds.attrs['collection']}",
             "collection": self.ds.attrs["collection"],
-            "product_name": f"{name}_RadCalNet_L1",
+            "product_name": self.path.name,
             "platform": "RadCalNet",
             "name": self.ds.attrs["Site"],
             "processing_level": "L1",
@@ -143,7 +140,7 @@ class RadCalNetMetadataExtractor(BaseMetadataExtractor):
             "spatial_resolution_units": "m",
             "geometry_ids": "insitu",
             "product_bounds": f"POINT ({lon} {lat})",
-            "product_date": parser.parse(str(self.ds.time.values[0])).date(),
+            "product_datetime": parser.parse(str(self.ds.time.values[0])).date(),
             "description": "TBD",
             "eoio:reader": "radcalnet",
             # json.dumps (not repr) keeps this parseable JSON, matching the eoio:subset

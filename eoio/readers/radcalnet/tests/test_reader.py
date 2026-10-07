@@ -3,6 +3,7 @@ from os import pardir
 import sys
 import tempfile
 import unittest
+import warnings
 from unittest.mock import patch
 import numpy as np
 import xarray as xr
@@ -661,10 +662,44 @@ class testVariableNamingAndAttrs(unittest.TestCase):
         self.assertEqual(ds["air_temperature"].attrs.get("units"), "K")
         self.assertEqual(ds["earth_sun_distance"].attrs.get("units"), "AU")
 
+    def test_meteo_variables_have_standard_name(self):
+        """Regression test: water_vapour/ozone/aerosol_optical_depth (and the
+        no-CF-equivalent aerosol_type/earth_sun_distance/local_time) used to have no
+        standard_name in VARIABLE_ATTRS at all, so BaseMetadataExtractor warned
+        "missing expected metadata key: standard_name" for every one of them on every
+        read -- see test_no_missing_standard_name_warnings below for the warning-free
+        assertion across the whole dataset."""
+        ds = RadCalNetReader(self.toa_path).open_dataset()
+        self.assertEqual(ds["water_vapour"].attrs.get("standard_name"), "atmosphere_mass_content_of_water_vapor")
+        self.assertEqual(
+            ds["ozone"].attrs.get("standard_name"), "equivalent_thickness_at_stp_of_atmosphere_ozone_content"
+        )
+        self.assertEqual(
+            ds["aerosol_optical_depth"].attrs.get("standard_name"), "atmosphere_optical_thickness_due_to_aerosol"
+        )
+        self.assertEqual(ds["aerosol_type"].attrs.get("standard_name"), "aerosol_type")
+        self.assertEqual(ds["earth_sun_distance"].attrs.get("standard_name"), "earth_sun_distance")
+
+    def test_no_missing_standard_name_warnings(self):
+        """No variable in a fully-read TOA or BOA dataset should trigger
+        BaseMetadataExtractor.get_variable_basic_metadata's "missing expected metadata
+        key" warning for standard_name -- see test_meteo_variables_have_standard_name
+        and _uncertainty_attrs for where each variable's standard_name now comes from."""
+        for path, reader_cls in ((self.toa_path, RadCalNetReader), (self.boa_path, RadCalNetInputReader)):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                reader_cls(path).open_dataset()
+
+            standard_name_warnings = [
+                str(w.message) for w in caught if "missing expected metadata key: standard_name" in str(w.message)
+            ]
+            self.assertEqual(standard_name_warnings, [])
+
     def test_uncertainty_variable_has_attrs(self):
         ds = RadCalNetReader(self.toa_path).open_dataset()
         self.assertEqual(ds["air_pressure_uncertainty"].attrs.get("units"), "hPa")
         self.assertIn("uncertainty", ds["air_pressure_uncertainty"].attrs.get("long_name", ""))
+        self.assertEqual(ds["air_pressure_uncertainty"].attrs.get("standard_name"), "air_pressure_uncertainty")
 
     def test_wavelength_coordinate_has_units(self):
         ds = RadCalNetReader(self.toa_path).open_dataset()

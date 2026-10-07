@@ -14,6 +14,30 @@ from eoio.readers.landsat.metadata import LSMetadataExtractor
 from eoio.utils.rasterio_utils import suggest_raster_chunks
 
 
+def _nearest_resample_2d(arr: np.ndarray, target_shape: tuple) -> np.ndarray:
+    """Nearest-neighbour resample a 2D array onto *target_shape*, independently per axis.
+
+    Used to align the angle files' own 30m pixel grid onto a band read at a different
+    resolution (namely Landsat's panchromatic B8, at 15m -- exactly double the angle
+    grid's linear resolution) before the per-pixel solar zenith angle correction below.
+    Not assumed to be an exact integer ratio: an ROI subset is clipped independently per
+    variable (see read_angles_into_dataset's/this function's own subset.clip_box/
+    geometries handling), so two rasters at different native resolutions covering the
+    same nominal footprint can come out a pixel or two off from a clean integer multiple
+    -- this still produces a sensible (if very slightly re-aligned) result in that case,
+    rather than only ever handling the exact-multiple case.
+
+    :param arr: source 2D array (angle grid).
+    :param target_shape: ``(rows, cols)`` to resample onto (the band's own shape).
+    :return: *arr* resampled onto *target_shape* via nearest-neighbour indexing.
+    """
+    src_rows, src_cols = arr.shape
+    tgt_rows, tgt_cols = target_shape
+    row_idx = np.minimum((np.arange(tgt_rows) * src_rows / tgt_rows).astype(int), src_rows - 1)
+    col_idx = np.minimum((np.arange(tgt_cols) * src_cols / tgt_cols).astype(int), src_cols - 1)
+    return arr[np.ix_(row_idx, col_idx)]
+
+
 def read_bands_into_dataset(
     *,
     ds: xr.Dataset,
@@ -107,9 +131,18 @@ def read_bands_into_dataset(
             da += band_mtd.get("reflectance_add", 0.0)
             # try per-pixel solar angles if available & if not in ds, use sun_elevation from metadata
             if "solar_zenith_angle" in ds:
-                # todo: handle case where grid coords do not align - for non-30m band
+                sza_values = ds["solar_zenith_angle"].values
+                if sza_values.shape != da.shape:
+                    # The angle files are always read at their own native (30m) grid --
+                    # see LSMetadataExtractor.get_angle_metadata()'s hardcoded
+                    # geometry_id -- which only matches most Landsat bands' own
+                    # resolution. The panchromatic B8 (15m) is the one exception, so its
+                    # per-pixel correction needs the angle grid resampled onto its own
+                    # (finer) grid first, rather than dividing two differently-shaped
+                    # arrays outright.
+                    sza_values = _nearest_resample_2d(sza_values, da.shape)
                 try:
-                    da /= np.sin(np.deg2rad(90.0 - ds["solar_zenith_angle"].values))  # per-pixel SZA
+                    da /= np.sin(np.deg2rad(90.0 - sza_values))  # per-pixel SZA
                 except Exception:
                     warnings.warn(
                         "Per-pixel solar zenith angle correction failed; using metadata sun elevation instead."
