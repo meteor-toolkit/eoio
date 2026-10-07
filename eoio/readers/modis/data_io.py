@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from math import dist
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -88,19 +87,17 @@ def read_bands_into_dataset(
                 dist2 = (lon - x_c) ** 2 + (lat - y_c) ** 2
 
                 # Nearest pixel
-                nearest_flat_idx = dist2.argmin().values
+                nearest_flat_idx = int(np.argmin(dist2.values))
                 iy, ix = np.unravel_index(nearest_flat_idx, dist2.shape)
 
                 if (lat.max() >= y_c) & (lat.min() <= y_c) & (lon.max() >= x_c) & (lon.min() <= x_c):
                     # ROI is smaller than a pixel but still covered by this pixel
-                    da = da.isel(**{f'y_grid_{preferred_resolution}m': iy, f'x_grid_{preferred_resolution}m': ix})
-                    ds = ds.isel(**{f'y_grid_{preferred_resolution}m': iy, f'x_grid_{preferred_resolution}m': ix})
+                    da = da.isel({f"y_grid_{preferred_resolution}m": iy, f"x_grid_{preferred_resolution}m": ix})
+                    ds = ds.isel({f"y_grid_{preferred_resolution}m": iy, f"x_grid_{preferred_resolution}m": ix})
                 else:
                     # ROI is outside the grid footprint
-                    raise ValueError(
-                        f"ROI outside dataset footprint. "
-                    )
-            
+                    raise ValueError("ROI outside dataset footprint. ")
+
     for var in meas_vars:
         var_mtd = mtd.variable_product_metadata(var) or {}
         var_da = da[var_mtd["band_id"]].isel(band=var_mtd["band_idx"])

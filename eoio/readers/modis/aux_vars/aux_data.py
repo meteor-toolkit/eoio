@@ -130,17 +130,15 @@ def add_aux(
                 dist2 = (lon - x_c) ** 2 + (lat - y_c) ** 2
 
                 # Nearest pixel
-                nearest_flat_idx = dist2.argmin().values
+                nearest_flat_idx = int(np.argmin(dist2.values))
                 iy, ix = np.unravel_index(nearest_flat_idx, dist2.shape)
 
                 if (lat.max() >= y_c) & (lat.min() <= y_c) & (lon.max() >= x_c) & (lon.min() <= x_c):
                     # ROI is smaller than a pixel but still covered by this pixel
-                    ds = ds.isel(**{f'y_grid_1000m': iy, f'x_grid_1000m': ix})
+                    ds = ds.isel({"y_grid_1000m": iy, "x_grid_1000m": ix})
                 else:
                     # ROI is outside the grid footprint
-                    raise ValueError(
-                        f"ROI outside dataset footprint. "
-                    )
+                    raise ValueError("ROI outside dataset footprint. ")
 
     return ds
 

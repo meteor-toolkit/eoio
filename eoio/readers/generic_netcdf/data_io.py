@@ -13,16 +13,15 @@ Functions
 """
 
 from __future__ import annotations
-from typing import List, Optional
+from typing import Any, List, Optional
 import xarray as xr
-from eoio.readers.generic_netcdf.subset import GENERIC_NETCDFSubset
 
 
 def read_dataset(
     *,
     ds: xr.Dataset,
     include_vars: Optional[List[str]] = None,
-    subset: Optional[GENERIC_NETCDFSubset] = None,
+    subset: Optional[Any] = None,
 ) -> xr.Dataset:
     """
     Read selected bands into an xarray.Dataset and apply subsetting.
@@ -34,7 +33,11 @@ def read_dataset(
     include_vars
         Variables to include in the output dataset.
     subset
-        Subsetting information containing series and wavelength indices.
+        Resolved subsetting information. Duck-typed rather than tied to one
+        dataclass: each reader owns its own subset type (e.g.
+        ``GENERIC_NETCDFSubset``, ``ECMWFSubset``) and only the attributes
+        present are applied, so a reader that resolves no ROI or no datetime
+        range simply omits those fields.
 
     Returns
     -------
@@ -51,12 +54,9 @@ def read_dataset(
             ds = ds.isel(wavelength=subset.wavelength_indices)
         if hasattr(subset, "datetime_indices") and subset.datetime_indices is not None:
             ds = ds.isel(datetime=subset.datetime_indices)
-        if (
-            hasattr(subset, "roi_subset")
-            and hasattr(subset.roi_subset, "geometries")
-            and subset.roi_subset.geometries is not None
-        ):
-            ds = ds.rio.clip(subset.roi_subset.geometries)
+        roi_subset = getattr(subset, "roi_subset", None)
+        if roi_subset is not None and roi_subset.geometries is not None:
+            ds = ds.rio.clip(roi_subset.geometries)
 
     reorder = []
     if "wavelength" in ds.dims:

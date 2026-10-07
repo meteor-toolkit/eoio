@@ -154,9 +154,7 @@ def read_masks(
         # Older UDM2 deliveries carry fewer than 8 bands (no UDM1 flag): fail clearly
         # rather than read a wrong band.
         if "band" not in da.dims or da.sizes["band"] < band:
-            raise ValueError(
-                f"UDM2 mask {path!r} has {da.sizes.get('band', 0)} band(s), no band {band} for {name!r}."
-            )
+            raise ValueError(f"UDM2 mask {path!r} has {da.sizes.get('band', 0)} band(s), no band {band} for {name!r}.")
 
         # isel is 0-based; UDM2_BANDS records the 1-based band number.
         layer = da.isel(band=band - 1, drop=True)

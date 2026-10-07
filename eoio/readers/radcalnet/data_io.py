@@ -282,6 +282,6 @@ def read_dataset(*, ds: xr.Dataset, include_vars: List[str], subset: RADCALNETSu
     if subset.wavelength_indices is not None:
         isel_kwargs["wavelength"] = subset.wavelength_indices
     if isel_kwargs:
-        ds = ds.isel(**isel_kwargs)
+        ds = ds.isel(isel_kwargs)
 
     return ds

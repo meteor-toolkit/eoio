@@ -73,7 +73,6 @@ class TestCopernicusDEMMetadataExtractor(unittest.TestCase):
         self.assertEqual(md["rows"], 3600)
         self.assertEqual(md["columns"], 3600)
 
-
     @patch("eoio.readers.copernicus_dem.metadata.normalize_footprint")
     @patch.object(CopernicusDEMMetadataExtractor, "_resolution_m")
     @patch.object(CopernicusDEMMetadataExtractor, "_root")

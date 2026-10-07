@@ -1,4 +1,4 @@
-""" 
+"""
 eoio.readers.radcalnet.metadata
 ==============================
 
