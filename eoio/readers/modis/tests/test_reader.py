@@ -141,6 +141,35 @@ class TestMODISReader(unittest.TestCase):
         mock_read_bands.assert_not_called()
 
     @patch("eoio.readers.modis.reader.xr.open_dataset")
+    @patch("eoio.readers.modis.reader.read_bands_into_dataset")
+    def test_open_dataset_passes_include_uncertainties_to_band_reader(
+        self,
+        mock_read_bands,
+        mock_open_xr,
+    ):
+        """The read_params include_uncertainties flag should reach the band reader."""
+        reader = self._make_reader_minimal()
+        reader.resolved_config = SimpleNamespace(
+            vars_sel={"meas": ["Band 1"]},
+            subset=None,
+            read_params={
+                "metadata_level": None,
+                "use_chunks": False,
+                "chunks": None,
+                "preferred_resolution": None,
+                "include_uncertainties": True,
+            },
+        )
+        reader.layout.collection = "MOD03"
+        reader.layout.geolocation_path.return_value = "/tmp/MOD03_geoloc.hdf"
+        mock_open_xr.return_value = xr.Dataset()
+        mock_read_bands.return_value = xr.Dataset({"Band 1": (("y", "x"), [[1]])})
+
+        reader.open_dataset()
+
+        self.assertTrue(mock_read_bands.call_args.kwargs["include_uncertainties"])
+
+    @patch("eoio.readers.modis.reader.xr.open_dataset")
     def test_open_dataset_handles_preferred_resolution_as_string(
         self,
         mock_open_xr,

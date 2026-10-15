@@ -104,6 +104,74 @@ class TestReadBandsIntoDataset(unittest.TestCase):
 
     @patch("eoio.readers.modis.data_io.add_geolocation")
     @patch("eoio.readers.modis.data_io.lazy_rioxarray")
+    def test_include_uncertainties_adds_uncertainty_component(self, mock_lazy_rioxarray, mock_add_geoloc):
+        """When include_uncertainties is True, uncertainty metadata should be attached to the band via ds.unc."""
+        da = self._make_da(np.array([[[100, 200], [300, 400]]], dtype=np.uint16))
+        da["500m Surface Reflectance Band 1_Uncert_Indexes"] = (
+            ["band", "y", "x"],
+            np.array([[[0.5, 1.0], [1.5, 2.0]]], dtype=np.float32),
+        )
+        da["500m Surface Reflectance Band 1_Uncert_Indexes"].attrs = {
+            "specified_uncertainty": [0.1],
+            "scaling_factor": [10.0],
+        }
+
+        rxr = MagicMock()
+        rxr.open_rasterio.return_value = da
+        mock_lazy_rioxarray.return_value = rxr
+        mock_add_geoloc.side_effect = lambda ds, **kwargs: ds
+
+        ds = xr.Dataset()
+        result = read_bands_into_dataset(
+            ds=ds,
+            geolocation_ds=self.geolocation_ds,
+            layout=self.layout,
+            meas_vars=["Band 1"],
+            subset=None,
+            mtd=self.mtd,
+            include_uncertainties=True,
+        )
+
+        self.assertIn("unc_comps", result["Band 1"].attrs)
+        self.assertIsNotNone(result.unc["Band 1"])
+        expected = 0.1 * np.exp(np.array([[0.5, 1.0], [1.5, 2.0]], dtype=np.float32) / 10.0)
+        np.testing.assert_allclose(result.unc["Band 1"].total_unc(), expected)
+
+    @patch("eoio.readers.modis.data_io.add_geolocation")
+    @patch("eoio.readers.modis.data_io.lazy_rioxarray")
+    def test_include_uncertainties_false_omits_uncertainty_component(self, mock_lazy_rioxarray, mock_add_geoloc):
+        """When include_uncertainties is False, the uncertainty metadata should not be attached."""
+        da = self._make_da(np.array([[[100, 200], [300, 400]]], dtype=np.uint16))
+        da["500m Surface Reflectance Band 1_Uncert_Indexes"] = (
+            ["band", "y", "x"],
+            np.array([[[0.5, 1.0], [1.5, 2.0]]], dtype=np.float32),
+        )
+        da["500m Surface Reflectance Band 1_Uncert_Indexes"].attrs = {
+            "specified_uncertainty": [0.1],
+            "scaling_factor": [10.0],
+        }
+
+        rxr = MagicMock()
+        rxr.open_rasterio.return_value = da
+        mock_lazy_rioxarray.return_value = rxr
+        mock_add_geoloc.side_effect = lambda ds, **kwargs: ds
+
+        ds = xr.Dataset()
+        result = read_bands_into_dataset(
+            ds=ds,
+            geolocation_ds=self.geolocation_ds,
+            layout=self.layout,
+            meas_vars=["Band 1"],
+            subset=None,
+            mtd=self.mtd,
+            include_uncertainties=False,
+        )
+
+        self.assertNotIn("unc_comps", result["Band 1"].attrs)
+        self.assertNotIn("u_rand_Band 1", result.data_vars)
+
+    @patch("eoio.readers.modis.data_io.add_geolocation")
+    @patch("eoio.readers.modis.data_io.lazy_rioxarray")
     def test_does_not_mask_zero_when_disabled(self, mock_lazy_rioxarray, mock_add_geoloc):
         """Test that zeros are not masked when mask_zero_as_nodata=False."""
         da = self._make_da(np.array([[[0, 100], [200, 0]]], dtype=np.uint16))

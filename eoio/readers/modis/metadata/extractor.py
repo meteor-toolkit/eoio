@@ -73,7 +73,7 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
         geoms = [str(r) + "m" for r in res]
 
         basic_md = {
-            "title": self.prod_hdf_reader.attrs.get("LONGNAME", "TBC"),
+            "title": self.prod_hdf_reader.attrs.get("LONGNAME" if self.layout.proc_version != 7 else "LongName", "TBC"),
             "summary": "TBC",
             "institution": "TBC",
             "source": "TBC",
@@ -81,20 +81,33 @@ class MODISMetadataExtractor(BaseMetadataExtractor):
             "date_created": "TBC",
             "standard_name_vocabulary": "TBC",
             "license": "TBC",
-            "collection_name": self.prod_hdf_reader.attrs.get("SHORTNAME", "TBC"),
-            "product_name": self.prod_hdf_reader.attrs.get("PRODUCT_NAME", "TBC"),
-            "platform": self.prod_hdf_reader.attrs.get("ASSOCIATEDPLATFORMSHORTNAME.1", "TBC"),
+            "collection_name": self.prod_hdf_reader.attrs.get(
+                "SHORTNAME" if self.layout.proc_version != 7 else "ShortName", "TBC"
+            ),
+            "product_name": self.prod_hdf_reader.attrs.get(
+                "PRODUCT_NAME" if self.layout.proc_version != 7 else "ProductName", "TBC"
+            ),
+            "platform": self.prod_hdf_reader.attrs.get(
+                "ASSOCIATEDPLATFORMSHORTNAME.1" if self.layout.proc_version != 7 else "platform", "TBC"
+            ),
             "platform_type": "satellite",
             "platform_vocabulary": "TBC",
-            "instrument": self.prod_hdf_reader.attrs.get("ASSOCIATEDINSTRUMENTSHORTNAME.1", "TBC"),
+            "instrument": self.prod_hdf_reader.attrs.get(
+                "ASSOCIATEDINSTRUMENTSHORTNAME.1" if self.layout.proc_version != 7 else "AssociatedSensorShortName",
+                "TBC",
+            ),
             "processing_level": self.layout.processing_level,
             "processing_version": self.layout.proc_version,
             "spatial_resolution": res,
             "geometry_ids": geoms,
             "geospatial_bounds": "TBC",
-            "product_datetime": self.prod_hdf_reader.attrs.get("RANGEBEGINNINGDATE", "TBC")
+            "product_datetime": self.prod_hdf_reader.attrs.get(
+                "RANGEBEGINNINGDATE" if self.layout.proc_version != 7 else "RangeBeginningDate", "TBC"
+            )
             + "T"
-            + self.prod_hdf_reader.attrs.get("RANGEBEGINNINGTIME", "TBC"),
+            + self.prod_hdf_reader.attrs.get(
+                "RANGEBEGINNINGTIME" if self.layout.proc_version != 7 else "RangeBeginningTime", "TBC"
+            ),
             "description": "TBD",
             "eoio:reader": "modis",
         }

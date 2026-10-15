@@ -163,6 +163,7 @@ class MODISReader(BaseRasterReader):
                 use_chunks=rp.get("use_chunks", False),
                 chunks=rp.get("chunks", None),
                 preferred_resolution=preferred_resolution,
+                include_uncertainties=rp.get("include_uncertainties", False),
             )
 
         # Add mask data if requested

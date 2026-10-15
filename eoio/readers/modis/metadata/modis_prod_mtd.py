@@ -1,5 +1,7 @@
 """eoio.readers.modis.metadata.modis_prod_mtd - reader for MODIS product metadata."""
 
+import xarray as xr
+
 from eoio.deps import lazy_rioxarray
 from eoio.readers.modis.layout import MODISLayout
 from eoio.readers.modis.metadata.var_names import (
@@ -40,7 +42,12 @@ class MODISL1BProdHDFReader:
     def __init__(self, layout: MODISLayout):
         rxr = lazy_rioxarray()
         if layout.file_res_key != "1":
-            ds = rxr.open_rasterio(layout.path)
+            if layout.proc_version != 7:
+                ds = rxr.open_rasterio(layout.path)
+            else:
+                dt = xr.open_datatree(layout.path)
+                ds = dt["/HDFEOS/SWATHS/MODIS_SWATH_Type_L1B/Data Fields"].to_dataset()
+                ds.attrs = dt.attrs
         else:
             ds = rxr.open_rasterio(layout.path)[1]
         self.attrs = ds.attrs
@@ -53,7 +60,11 @@ class MODISL1BProdHDFReader:
             idx = var_attrs["band_names"].split(",").index(var.split(" ")[-1])
             self.var_attrs[var]["band_idx"] = idx
             for attr_key in [x for x in var_attrs.keys() if ("_scales" in x) or ("_offsets" in x)]:
-                attr_val = float(var_attrs[attr_key].split(",")[idx])
+                attr = var_attrs[attr_key]
+                if isinstance(attr, str):
+                    attr_val = float(attr.split(",")[idx])
+                else:
+                    attr_val = float(attr[idx])
                 self.var_attrs[var][attr_key] = attr_val
 
 

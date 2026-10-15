@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import xarray as xr
+import obsarray  # noqa: F401
 
 from eoio.deps import lazy_rioxarray
 from eoio.readers.modis.layout import MODISLayout
@@ -34,6 +35,7 @@ def read_bands_into_dataset(
     use_chunks: bool = False,
     preferred_resolution: Optional[int] = None,
     mask_zero_as_nodata: bool = True,
+    include_uncertainties: bool = False,
 ) -> xr.Dataset:
 
     rxr = lazy_rioxarray()
@@ -48,7 +50,10 @@ def read_bands_into_dataset(
     # Read and format bands
     # ------------------------------------------------------------------
     if layout.processing_level == "L1B":
-        da = rxr.open_rasterio(layout.path, chunks=chunks)
+        if layout.proc_version != 7:
+            da = rxr.open_rasterio(layout.path, chunks=chunks)
+        else:
+            da = xr.open_dataset(layout.path, group="/HDFEOS/SWATHS/MODIS_SWATH_Type_L1B/Data Fields", chunks=chunks)
     elif layout.processing_level == "L2":
         da = rxr.open_rasterio(layout.path, chunks=chunks)[list(L2_FILE_RES_DICT.keys()).index(layout.file_res_key)]
 
@@ -63,6 +68,15 @@ def read_bands_into_dataset(
         rename_map["x"] = f"x_grid_{preferred_resolution}m"
     if "y" in da.dims:
         rename_map["y"] = f"y_grid_{preferred_resolution}m"
+    if layout.proc_version == 7 and layout.processing_level == "L1B":
+        if [d for d in da.sizes if da.sizes[d] == len(ds[f"y_grid_{preferred_resolution}m"])][0]:
+            rename_map[[d for d in da.sizes if da.sizes[d] == len(ds[f"y_grid_{preferred_resolution}m"])][0]] = (
+                f"y_grid_{preferred_resolution}m"
+            )
+        if [d for d in da.sizes if da.sizes[d] == len(ds[f"x_grid_{preferred_resolution}m"])][0]:
+            rename_map[[d for d in da.sizes if da.sizes[d] == len(ds[f"x_grid_{preferred_resolution}m"])][0]] = (
+                f"x_grid_{preferred_resolution}m"
+            )
     if rename_map:
         da = da.rename(rename_map)
 
@@ -97,10 +111,19 @@ def read_bands_into_dataset(
                 else:
                     # ROI is outside the grid footprint
                     raise ValueError("ROI outside dataset footprint. ")
-
     for var in meas_vars:
         var_mtd = mtd.variable_product_metadata(var) or {}
-        var_da = da[var_mtd["band_id"]].isel(band=var_mtd["band_idx"])
+        band_dim = (
+            [d for d in da[var_mtd["band_id"]].dims if "band" in d.lower()][0] if "band" not in da.dims else "band"
+        )
+        var_da = da[var_mtd["band_id"]].isel({band_dim: var_mtd["band_idx"]})
+        if include_uncertainties:
+            unc_band_id = var_mtd["band_id"] + "_Uncert_Indexes"
+            unc_da = da[unc_band_id].isel({band_dim: var_mtd["band_idx"]})
+            # var_da.attrs["uncertainty"] = unc_da.attrs
+            spec_unc = unc_da.attrs["specified_uncertainty"][var_mtd["band_idx"]]
+            scaling_factor = unc_da.attrs["scaling_factor"][var_mtd["band_idx"]]
+            rel_unc_values = spec_unc * np.exp(unc_da.values / scaling_factor)
         # --------------------------------------------------------------
         # Mask nodata before scaling
         # --------------------------------------------------------------
@@ -126,7 +149,6 @@ def read_bands_into_dataset(
             var_da = var_da.astype("float32")
             var_da -= np.float32(off)
             var_da *= np.float32(q)
-
         else:
             # Unknown / future layer type: leave as read
             pass
@@ -137,13 +159,23 @@ def read_bands_into_dataset(
                 var_da.coords[coord_name].attrs = {}
 
         ds[var] = var_da
+        if include_uncertainties:
+            ds.unc[var][f"u_rand_{var}"] = (
+                list(ds[var].dims),
+                rel_unc_values,
+            )
+            ds[f"u_rand_{var}"].attrs["original_attrs"] = unc_da.attrs
+            ds[f"u_rand_{var}"].attrs["units"] = "percent"
+            ds[f"u_rand_{var}"].attrs["long_name"] = (
+                "Earth View 250M Aggregated 500M Reflective Solar Bands Uncertainty"
+            )
 
-    # Apply quality flags if present
-    ds = ds.where(
-        (
-            da[f"{var_mtd.get('geometry_id')} Reflectance Band Quality"].sel(band=1)
-            == int("0b1000000000000000000000000000000", 2)
-        ).values
-    )
+    if f"{var_mtd.get('geometry_id')} Reflectance Band Quality" in da.data_vars:
+        ds = ds.where(
+            (
+                da[f"{var_mtd.get('geometry_id')} Reflectance Band Quality"].sel(band=1)
+                == int("0b1000000000000000000000000000000", 2)
+            ).values
+        )
 
     return ds
