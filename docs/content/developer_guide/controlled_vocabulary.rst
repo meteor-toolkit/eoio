@@ -137,6 +137,8 @@ The ``platform`` attribute must use one of the following canonical tokens.
      -
    * - ``PlanetScope``
      -
+   * - ``Skybee``
+     - constellr HIVE constellation (all satellites; the individual one is in ``satellite_id``)
    * - ``THEOS``
      - GISTDA THEOS-1
 
@@ -171,6 +173,8 @@ The ``instrument`` attribute must use one of the following canonical tokens.
      - Spinning Enhanced Visible and Infrared Imager
    * - ``SuperDove``
      - PlanetScope 8-band instrument
+   * - ``VNIR``
+     - Visible and near-infrared imager (constellr Skybee)
    * - ``TOP_<n>``
      - THEOS-1 multispectral instrument, ``n`` being METADATA.DIM's ``INSTRUMENT_INDEX``
 
