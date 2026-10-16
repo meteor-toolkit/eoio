@@ -40,6 +40,7 @@ class ReaderFactory:
         radcalnet_BOA_pattern = re.compile(r".*.v*.*.input")
         planetscope_pattern = re.compile(r".*AnalyticMS.*8b.*.tif\Z")
         airbus_pleiades_pattern = re.compile(r".IMG_PHR*.*")
+        gistda_theos_pattern = re.compile(r"TH_CAT_.*")
         EMITL1B_pattern = re.compile(r"EMIT.?_L1B_.*.nc\Z")
         ERA5_pattern = re.compile(r"ERA5*.*")
         CAMS_pattern = re.compile(r"CAMS*.*")
@@ -100,6 +101,11 @@ class ReaderFactory:
             from eoio.readers.airbus_pleiades.reader import AirbusPleiadesReader
 
             return AirbusPleiadesReader
+
+        elif re.search(gistda_theos_pattern, path):
+            from eoio.readers.gistda_theos.reader import GISTDATHEOSReader
+
+            return GISTDATHEOSReader
 
         elif re.search(radcalnet_TOA_pattern, path):
             from eoio.readers.radcalnet.reader import RadCalNetReader

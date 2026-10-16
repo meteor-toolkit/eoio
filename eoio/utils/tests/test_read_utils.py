@@ -3,6 +3,7 @@
 import io
 import os
 import tarfile
+import tempfile
 import unittest
 import zipfile
 from pathlib import Path
@@ -397,25 +398,47 @@ class TestReadUtils(unittest.TestCase):
         mock_extract_tarred_file.assert_not_called()
         mock_extract_zipped_file.assert_not_called()
 
-    @patch("eoio.utils.read_utils.os.path.exists")
-    @patch("eoio.utils.read_utils.zipfile.ZipFile")
-    def test_extract_zipped_file_ValidZip(self, mock_zipfile, mock_exists):
-        # Mock path_extracted does not exist
-        mock_exists.return_value = False
+    def test_extract_zipped_file_self_wrapping_zip_extracts_to_parent(self):
+        """A zip whose one top-level entry already matches path_extracted's own
+        name (e.g. a real Sentinel-2 delivery zip's members, all prefixed
+        "<product>.SAFE/...") extracts relative to its parent directory -- the
+        zip's own folder becomes path_extracted with nothing extra created."""
+        with tempfile.TemporaryDirectory() as td:
+            zip_path = os.path.join(td, "product.zip")
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("product.SAFE/file1.txt", "one")
+                zf.writestr("product.SAFE/sub/file2.txt", "two")
 
-        # Mock zipfile behavior
-        mock_zip_instance = MagicMock()
-        mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
-        mock_zip_instance.infolist.return_value = ["file1.txt", "file2.txt"]
+            path_extracted = os.path.join(td, "product.SAFE")
+            extract_zipped_file(zip_path, path_extracted)
 
-        # Run the function
-        extract_zipped_file("fake_path.zip", "fake_extracted_path")
+            self.assertTrue(os.path.isfile(os.path.join(path_extracted, "file1.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(path_extracted, "sub", "file2.txt")))
+            # nothing doubly-nested
+            self.assertFalse(os.path.exists(os.path.join(path_extracted, "product.SAFE")))
 
-        # Assertions
-        mock_zipfile.assert_called_once_with("fake_path.zip", "r")
-        mock_zip_instance.infolist.assert_called_once()
-        self.assertEqual(2, mock_zip_instance.extract.call_count)
-        mock_zip_instance.close.assert_called_once()
+    def test_extract_zipped_file_non_wrapping_zip_creates_path_extracted(self):
+        """A zip that mixes loose top-level files with a differently-named folder
+        (a real GISTDA THEOS delivery's shape: README/PDF/LOGO alongside one
+        product-id-named folder, not the outer order-derived zip filename) gets
+        path_extracted created and every member's own relative path placed inside
+        it -- regression test for the "files scattered into the zip's parent
+        directory instead of into path_extracted" bug."""
+        with tempfile.TemporaryDirectory() as td:
+            zip_path = os.path.join(td, "TH_CAT_1_1M_SITE_20220101.zip")
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.writestr("README.HTM", "readme")
+                zf.writestr("LOGO.JPG", "logo")
+                zf.writestr("TH_CAT_1/METADATA.DIM", "metadata")
+
+            path_extracted = os.path.join(td, "TH_CAT_1_1M_SITE_20220101")
+            extract_zipped_file(zip_path, path_extracted)
+
+            self.assertTrue(os.path.isfile(os.path.join(path_extracted, "README.HTM")))
+            self.assertTrue(os.path.isfile(os.path.join(path_extracted, "LOGO.JPG")))
+            self.assertTrue(os.path.isfile(os.path.join(path_extracted, "TH_CAT_1", "METADATA.DIM")))
+            # nothing landed directly in the zip's own parent directory (td)
+            self.assertEqual(sorted(os.listdir(td)), sorted([os.path.basename(zip_path), "TH_CAT_1_1M_SITE_20220101"]))
 
     @patch("eoio.utils.read_utils.os.path.exists")
     @patch("eoio.utils.read_utils.zipfile.ZipFile")
@@ -437,25 +460,6 @@ class TestReadUtils(unittest.TestCase):
         # Ensure zipfile.ZipFile is never opened
         mock_zipfile.assert_not_called()
         mock_exists.assert_not_called()
-
-    @patch("eoio.utils.read_utils.os.path.exists")
-    @patch("eoio.utils.read_utils.zipfile.ZipFile")
-    def test_extract_zipped_file_EmptyZip(self, mock_zipfile, mock_exists):
-        # Mock path_extracted does not exist
-        mock_exists.return_value = False
-
-        # Mock zipfile behavior
-        mock_zip_instance = MagicMock()
-        mock_zipfile.return_value.__enter__.return_value = mock_zip_instance
-        mock_zip_instance.infolist.return_value = []
-
-        extract_zipped_file("fake_path.zip", "fake_extracted_path")
-
-        # Assertions
-        mock_zipfile.assert_called_once_with("fake_path.zip", "r")
-        mock_zip_instance.infolist.assert_called_once()
-        mock_zip_instance.extract.assert_not_called()
-        mock_zip_instance.close.assert_called_once()
 
     @patch("eoio.utils.read_utils.os.path.exists")
     @patch("eoio.utils.read_utils.os.makedirs")

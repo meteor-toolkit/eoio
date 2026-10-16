@@ -137,6 +137,8 @@ The ``platform`` attribute must use one of the following canonical tokens.
      -
    * - ``PlanetScope``
      -
+   * - ``THEOS``
+     - GISTDA THEOS-1
 
 If the platform you are adding is not listed here, add it to this table as part of
 your pull request.
@@ -169,6 +171,8 @@ The ``instrument`` attribute must use one of the following canonical tokens.
      - Spinning Enhanced Visible and Infrared Imager
    * - ``SuperDove``
      - PlanetScope 8-band instrument
+   * - ``TOP_<n>``
+     - THEOS-1 multispectral instrument, ``n`` being METADATA.DIM's ``INSTRUMENT_INDEX``
 
 
 .. _cv.level:

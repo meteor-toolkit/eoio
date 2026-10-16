@@ -19,6 +19,53 @@ __author__ = "Maddie Stedman <maddie.stedman@npl.co.uk>"
 __all__ = []
 
 
+def _zip_top_level_entries(path: str) -> dict:
+    """``{name: is_dir}`` for every entry at the top level of the zip at *path* --
+    ``is_dir`` true for a name that's either an explicit directory entry or has
+    nested members under it (``"<name>/..."``). Cheap: reads only the zip's
+    central directory, not member contents.
+
+    :param path: zip archive path.
+    """
+    entries: dict = {}
+    with zipfile.ZipFile(path) as zf:
+        for info in zf.infolist():
+            top = info.filename.split("/", 1)[0]
+            is_dir = info.is_dir() or "/" in info.filename
+            entries[top] = entries.get(top, False) or is_dir
+    return entries
+
+
+def _zip_self_wraps(path: str, path_extracted: str) -> bool:
+    """Whether the zip at *path* already nests every one of its members under one
+    top-level directory named exactly ``os.path.basename(path_extracted)`` -- true
+    for an archive already packaged the way this project expects downstream (e.g.
+    a real Sentinel-2 delivery zip's own members are already prefixed
+    ``"<product>.SAFE/..."``), so :py:func:`extract_zipped_file` can extract
+    relative to the zip's own parent directory and get *path_extracted* for free,
+    with no directory of its own to create.
+
+    False for a zip whose top level mixes loose files with a folder, has more
+    than one top-level entry, or wraps everything in a folder whose name doesn't
+    match *path_extracted* -- e.g. a GISTDA THEOS delivery zip, whose top level
+    holds loose wrapper files (README/PDF/LOGO) alongside one folder named for
+    the product id, not the outer zip's own (order-derived) filename. For those,
+    :py:func:`extract_zipped_file` creates *path_extracted* itself instead and
+    extracts every member's own relative path underneath it, so the result is
+    always ``"<path_extracted>/<member's own path>"`` regardless of the zip's
+    internal packaging -- exactly what every other archive here already gives
+    callers via :py:func:`extract_tarred_file`.
+
+    :param path: zip archive path.
+    :param path_extracted: :py:func:`extract_file`'s filename-derived target.
+    """
+    entries = _zip_top_level_entries(path)
+    if len(entries) != 1:
+        return False
+    ((name, is_dir),) = entries.items()
+    return is_dir and name == os.path.basename(path_extracted)
+
+
 def _strip_archive_suffixes(path: str) -> str:
     """
     Strip archive suffixes from a path so nested archives like .tar.gz resolve to the product root.
@@ -279,21 +326,29 @@ def _prune_empty_dirs(root: str) -> None:
 
 def extract_zipped_file(path: str, path_extracted: Optional[str] = None) -> None:
     """
-    Extracts data from zipped file indicated by path
+    Extracts data from zipped file indicated by path.
+
+    If the zip already wraps everything in one top-level folder matching
+    *path_extracted*'s own name (see :py:func:`_zip_self_wraps`), extracts
+    relative to its parent directory -- the zip's own folder becomes
+    *path_extracted* with no extra work. Otherwise (loose top-level files, a
+    differently-named folder, ...) creates *path_extracted* itself and extracts
+    every member's own relative path underneath it, so the result is always
+    ``"<path_extracted>/<member's own path>"`` regardless of the zip's internal
+    packaging.
 
     :param path: path to data
     :param path_extracted: path to extracted data
     """
     if path_extracted is not None:
         if not os.path.exists(path_extracted):
+            if _zip_self_wraps(path, path_extracted):
+                target = os.path.dirname(path_extracted)
+            else:
+                os.makedirs(path_extracted, exist_ok=True)
+                target = path_extracted
             with zipfile.ZipFile(path, "r") as zfile:
-                fileinfos = zfile.infolist()
-                for fileinfo in fileinfos:
-                    zfile.extract(
-                        fileinfo,
-                        path=os.path.dirname(path_extracted),
-                    )
-                zfile.close()
+                zfile.extractall(target)
 
 
 def extract_tarred_file(path: str, path_extracted: Optional[str] = None) -> None:
