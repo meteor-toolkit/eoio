@@ -43,6 +43,7 @@ class ReaderFactory:
         gistda_theos_pattern = re.compile(r"TH_CAT_.*")
         constellr_skybee_pattern = re.compile(r"HIVE_L1C_.*")
         EMITL1B_pattern = re.compile(r"EMIT.?_L1B_.*.nc\Z")
+        FLEXL2_pattern = re.compile(r"flx_l2__flxsyn_.*\.nc\Z", re.IGNORECASE)
         ERA5_pattern = re.compile(r"ERA5*.*")
         CAMS_pattern = re.compile(r"CAMS*.*")
         FLOX_pattern = re.compile(r".*.FLOX*.*")
@@ -127,6 +128,11 @@ class ReaderFactory:
             from eoio.readers.emit.reader import EMITL1BReader
 
             return EMITL1BReader
+
+        elif re.search(FLEXL2_pattern, path):
+            from eoio.readers.flex.reader import FLEXL2Reader
+
+            return FLEXL2Reader
 
         elif re.search(modis_terra_pattern, path):
             from eoio.readers.modis.reader import MODISReader
