@@ -1,15 +1,16 @@
 """
-eoio.readers.hypernets.data_io
-==============================
+eoio.readers.generic_netcdf.data_io
+===================================
 
-Data I/O utilities for HYPERNETS datasets.
+Data I/O utilities for netCDF datasets, shared by the generic netCDF reader and the
+ECMWF reader.
 
 Functions
 ---------
 .. autosummary::
    :toctree: generated/
 
-   read_bands_into_dataset
+   read_dataset
 """
 
 from __future__ import annotations
@@ -24,25 +25,15 @@ def read_dataset(
     subset: Optional[Any] = None,
 ) -> xr.Dataset:
     """
-    Read selected bands into an xarray.Dataset and apply subsetting.
+    Select variables from a dataset and apply subsetting.
 
-    Parameters
-    ----------
-    ds
-        The input dataset.
-    include_vars
-        Variables to include in the output dataset.
-    subset
-        Resolved subsetting information. Duck-typed rather than tied to one
-        dataclass: each reader owns its own subset type (e.g.
-        ``GENERIC_NETCDFSubset``, ``ECMWFSubset``) and only the attributes
-        present are applied, so a reader that resolves no ROI or no datetime
-        range simply omits those fields.
-
-    Returns
-    -------
-    xarray.Dataset
-        The subsetted dataset containing only the selected variables.
+    :param ds: The input dataset.
+    :param include_vars: Variables to include in the output dataset.
+    :param subset: Resolved subsetting information. Duck-typed rather than tied to one
+        dataclass: each reader owns its own subset type (e.g. ``GENERIC_NETCDFSubset``,
+        ``ECMWFSubset``) and only the attributes present are applied, so a reader that
+        resolves no ROI or no datetime range simply omits those fields.
+    :returns: The subsetted dataset containing only the selected variables.
     """
 
     # only keep variables in include_vars, drop the rest

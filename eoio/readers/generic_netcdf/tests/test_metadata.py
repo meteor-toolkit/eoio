@@ -46,6 +46,29 @@ class TestGenericNetCDFMetadataExtractor(unittest.TestCase):
         md = extractor.get_basic_metadata()
         self.assertEqual(md["eoio:subset"], "")
 
+    def test_footprint_prefers_a_footprint_attr(self):
+        """A decoded eoio footprint carries its CRS, which product_bounds alone does not."""
+        from shapely.geometry import box
+
+        ds = xr.Dataset(
+            {"var1": ("series", [1, 2])},
+            attrs={
+                "product_bounds": box(0, 0, 1, 1),
+                "footprint": {"geometry": box(0, 0, 1, 1), "crs": "EPSG:32630", "bounds": (0, 0, 1, 1)},
+            },
+        )
+        md = GenericNetCDFMetadataExtractor(self.reader, ds).get_basic_metadata()
+        self.assertEqual(md["footprint"]["crs"], "EPSG:32630")
+
+    def test_footprint_falls_back_to_product_bounds(self):
+        ds = xr.Dataset(
+            {"var1": ("series", [1, 2])},
+            attrs={"product_bounds": "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", "footprint_crs": "EPSG:4326"},
+        )
+        md = GenericNetCDFMetadataExtractor(self.reader, ds).get_basic_metadata()
+        self.assertEqual(md["footprint"]["crs"], "EPSG:4326")
+        self.assertEqual(md["footprint"]["bounds"], (0.0, 0.0, 1.0, 1.0))
+
     def test_eoio_subset_is_valid_json_when_subset_present(self):
         """Regression test: eoio:subset used to be repr(self.subset), Python-only
         syntax (e.g. single quotes) that isn't parseable JSON."""

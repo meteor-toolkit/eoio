@@ -20,6 +20,14 @@ The read function takes in the satellite product filepath as the input to be rea
 
     path = T:\ECO\EOServer\data\satellite\S2A_MSI\L1\PICS\Libya4\S2A_MSIL1C_20151223T091412_N0201_R050_T34RGS_20151223T092043.SAFE
 
+Any other ``.nc`` file, including one written by ``eoio.write``, is read by the generic
+netCDF reader. It decodes attributes as it reads, so ``datetime`` values, nested
+dictionaries and geometries that eoio encoded on write come back as Python objects
+(see :doc:`write_func`). This applies to netCDF files from other sources too, on a
+best-effort basis: string attributes holding a JSON object or array, or an ISO-8601
+date and time, are returned as the corresponding Python value. All other attributes are
+returned unchanged.
+
 Subsetting and Reading Parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Various options can be specified in order to control the exact usage of the read function.

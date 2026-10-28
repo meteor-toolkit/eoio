@@ -1,5 +1,8 @@
 """eoio.read - tests for eoio.read"""
 
+import datetime as dt
+import importlib.util
+import pathlib
 import os
 import tempfile
 import unittest
@@ -8,19 +11,19 @@ import unittest.mock as mock
 import numpy as np
 import xarray as xr
 
+import eoio.processors  # noqa: F401 - ensures all built-in processors are registered
 from eoio.interface import (
-    # mid_lon_lat,
-    # product_bounds,
-    read,
     read_multi,
     process,
     product_processors,
     _resolve_multi_paths,
-    # write,
+    read,
+    write,
+    writer_options,
 )
 from eoio.processors.registry import PROCESSOR_REGISTRY
 from eoio.readers.base import BaseReader
-import eoio.processors  # noqa: F401 - ensures all built-in processors are registered
+from eoio.serialisation import decode_attrs
 
 __author__ = [
     "Sam Hunt <sam.hunt@npl.co.uk>",
@@ -276,6 +279,167 @@ class TestReadMulti(unittest.TestCase):
         self.assertEqual(result["err_corr_radiance"].dims, ("time", "measurement", "measurement"))
         self.assertEqual(dict(result.sizes), {"time": 2, "measurement": 3})
         np.testing.assert_array_equal(result["err_corr_radiance"].isel(time=1).values, np.eye(3, dtype="float32") * 2.0)
+
+
+class TestWrite(unittest.TestCase):
+    """Tests for eoio.write and eoio.writer_options."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = pathlib.Path(self.tmp.name)
+        self.ds = xr.Dataset(
+            {"B02": (("y", "x"), np.zeros((4, 4), dtype="float32"))},
+            coords={"x": np.arange(4), "y": np.arange(4)},
+            attrs={"title": "test", "acquired": dt.datetime(2023, 7, 2, 10, 0)},
+        )
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_write_returns_the_path(self):
+        target = self.tmp_path / "out.nc"
+        self.assertEqual(write(self.ds, target, writer="netcdf"), str(target))
+        self.assertTrue(target.exists())
+
+    def test_write_accepts_a_string_path(self):
+        target = self.tmp_path / "out.nc"
+        self.assertEqual(write(self.ds, str(target), writer="netcdf"), str(target))
+
+    def test_write_round_trips_attrs_needing_encoding(self):
+        target = write(self.ds, self.tmp_path / "out.nc", writer="netcdf")
+        with xr.open_dataset(target) as opened:
+            back = decode_attrs(opened)
+        self.assertEqual(back.attrs["acquired"], dt.datetime(2023, 7, 2, 10, 0))
+
+    def test_write_accepts_a_datatree(self):
+        tree = xr.DataTree.from_dict({"/": xr.Dataset(), "/s2": self.ds})
+        target = write(tree, self.tmp_path / "tree.nc", writer="netcdf")
+        with xr.open_datatree(target) as back:
+            self.assertIn("s2", [node.name for node in back.subtree if node.name])
+
+    def test_unknown_writer_raises_and_lists_the_options(self):
+        with self.assertRaises(ValueError) as ctx:
+            write(self.ds, self.tmp_path / "out.nc", writer="not_a_writer")
+        self.assertIn("netcdf", str(ctx.exception))
+
+    def test_object_the_writer_cannot_express_raises(self):
+        with self.assertRaises(TypeError):
+            write("not a dataset", self.tmp_path / "out.nc", writer="netcdf")
+
+    def test_none_object_raises(self):
+        with self.assertRaises(TypeError):
+            write(None, self.tmp_path / "out.nc", writer="netcdf")
+
+    def test_none_path_raises(self):
+        with self.assertRaises(TypeError):
+            write(self.ds, None, writer="netcdf")
+
+    def test_misspelt_keyword_raises_rather_than_being_ignored(self):
+        with self.assertRaises(TypeError):
+            write(self.ds, self.tmp_path / "out.nc", writer="netcdf", write_param={"complevel": 9})
+
+    def test_write_params_are_passed_to_the_writer(self):
+        target = write(
+            self.ds, self.tmp_path / "out.nc", writer="netcdf", write_params={"complevel": 9, "compress_min_bytes": 0}
+        )
+        with xr.open_dataset(target) as back:
+            self.assertEqual(back["B02"].encoding["complevel"], 9)
+
+    def test_unknown_write_param_raises(self):
+        with self.assertRaises(ValueError):
+            write(self.ds, self.tmp_path / "out.nc", writer="netcdf", write_params={"nope": 1})
+
+    def test_parent_directories_are_created(self):
+        target = self.tmp_path / "nested" / "deeper" / "out.nc"
+        write(self.ds, target, writer="netcdf")
+        self.assertTrue(target.exists())
+
+    def test_processors_run_before_writing(self):
+        recorded = {}
+
+        def fake_process(obj, processors, context):
+            recorded["processors"] = processors
+            recorded["path"] = context["path"]
+            return obj
+
+        with mock.patch("eoio.interface.process", side_effect=fake_process) as patched:
+            write(self.ds, self.tmp_path / "out.nc", writer="netcdf", processors={"units": {}})
+
+        patched.assert_called_once()
+        self.assertEqual(recorded["processors"], {"units": {}})
+        self.assertIn("out.nc", recorded["path"])
+
+    def test_processors_are_skipped_when_not_requested(self):
+        with mock.patch("eoio.interface.process") as patched:
+            write(self.ds, self.tmp_path / "out.nc", writer="netcdf")
+        patched.assert_not_called()
+
+    def test_provenance_records_the_writer(self):
+        target = write(self.ds, self.tmp_path / "out.nc", writer="netcdf")
+        with xr.open_dataset(target) as opened:
+            back = decode_attrs(opened)
+        self.assertEqual(back.attrs["eoio:processing_steps"][-1]["writer"], "netcdf")
+
+    def test_processors_with_a_datatree_raise_clearly(self):
+        tree = xr.DataTree.from_dict({"/": xr.Dataset(), "/s2": self.ds})
+        with self.assertRaises(TypeError) as ctx:
+            write(tree, self.tmp_path / "tree.nc", writer="netcdf", processors={"units": {}})
+        self.assertIn("processors run on a Dataset", str(ctx.exception))
+
+    @unittest.skipIf(importlib.util.find_spec("zarr") is None, "zarr not installed")
+    def test_write_to_zarr(self):
+        target = write(self.ds, self.tmp_path / "out.zarr", writer="zarr")
+        with xr.open_zarr(target) as back:
+            np.testing.assert_array_equal(back["B02"].values, self.ds["B02"].values)
+
+    @unittest.skipIf(importlib.util.find_spec("zarr") is None, "zarr not installed")
+    def test_write_appends_to_zarr_with_the_same_call(self):
+        target = self.tmp_path / "stack.zarr"
+        for day in range(3):
+            step = self.ds.expand_dims(time=[np.datetime64("2023-07-02") + np.timedelta64(day, "D")])
+            write(step, target, writer="zarr", write_params={"append_dim": "time"})
+        with xr.open_zarr(target) as back:
+            self.assertEqual(back.sizes["time"], 3)
+
+    @unittest.skipIf(importlib.util.find_spec("zarr") is None, "zarr not installed")
+    def test_write_refuses_a_repeated_append(self):
+        target = self.tmp_path / "stack.zarr"
+        step = self.ds.expand_dims(time=[np.datetime64("2023-07-02")])
+        write(step, target, writer="zarr", write_params={"append_dim": "time"})
+        with self.assertRaises(ValueError):
+            write(step, target, writer="zarr", write_params={"append_dim": "time"})
+
+    def test_input_is_not_modified(self):
+        before = dict(self.ds.attrs)
+        write(self.ds, self.tmp_path / "out.nc", writer="netcdf")
+        self.assertEqual(self.ds.attrs, before)
+
+
+class TestInterfaceExports(unittest.TestCase):
+    def test_all_has_no_duplicates_and_every_name_exists(self):
+        import eoio.interface as interface
+
+        self.assertEqual(len(interface.__all__), len(set(interface.__all__)))
+        for name in interface.__all__:
+            self.assertTrue(hasattr(interface, name), name)
+
+
+class TestWriterOptions(unittest.TestCase):
+    """Tests for eoio.writer_options."""
+
+    def test_returns_the_writers_options(self):
+        options = writer_options("netcdf")
+        self.assertIn("write_params", options)
+        self.assertIn("complevel", options["write_params"])
+
+    def test_includes_the_shared_base_options(self):
+        options = writer_options("netcdf")["write_params"]
+        self.assertIn("encode_attrs", options)
+        self.assertIn("on_nonconformance", options)
+
+    def test_unknown_writer_raises(self):
+        with self.assertRaises(ValueError):
+            writer_options("not_a_writer")
 
 
 if __name__ == "__main__":

@@ -3,16 +3,21 @@
 # import h5py  # type: ignore
 
 # from eoio._show_versions import show_versions
-from eoio.interface import read, read_multi, product_options  # (
+from eoio import (
+    serialisation,
+    writers,
+)
+from eoio.interface import product_options, read, read_multi, write, writer_options
 
-#     product_bounds,
-#     product_processors,
-#     product_subsetting_params,
-#     read,
-#     write,
-# )
-
-__all__ = ["read", "read_multi", "product_options"]  # , "write", "show_versions"]
+__all__ = [
+    "product_options",
+    "read",
+    "read_multi",
+    "serialisation",
+    "write",
+    "writer_options",
+    "writers",
+]
 
 from importlib.metadata import PackageNotFoundError, version
 

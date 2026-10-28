@@ -11,4 +11,5 @@ examples that describe common usages of eoio.
 
    read_func
    read_multi_func
+   write_func
    satellites_formats

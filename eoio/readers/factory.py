@@ -46,12 +46,11 @@ class ReaderFactory:
         FLEXL2_pattern = re.compile(r"flx_l2__flxsyn_.*\.nc\Z", re.IGNORECASE)
         ERA5_pattern = re.compile(r"ERA5*.*")
         CAMS_pattern = re.compile(r"CAMS*.*")
-        FLOX_pattern = re.compile(r".*.FLOX*.*")
-        nc_pattern = re.compile(r".*.nc")
         esa_world_cover_pattern = re.compile(r"ESA_WorldCover.*.tif")
         modis_terra_pattern = re.compile(r"(?:^|[/\\])MOD\d+[^/\\]*$")
         modis_aqua_pattern = re.compile(r"(?:^|[/\\])MYD\d+[^/\\]*$")
         copernicus_dem_pattern = re.compile(r".*Copernicus.*DEM.*")
+        nc_pattern = re.compile(r"\.nc\Z", re.IGNORECASE)  # generic netCDF fallback
         # > Check if input product_path matches any known product regular expressions
         #   return parsingFactory as appropriate
         if re.search(S2MSIL1C_pattern, path):
@@ -159,7 +158,9 @@ class ReaderFactory:
 
             return ESAWorldCoverReader
 
-        elif re.search(FLOX_pattern, path) or re.search(nc_pattern, path):
+        # Generic fallback for any netCDF file - must stay the final branch, so that every
+        # product-specific netCDF reader above gets the first chance to claim the path.
+        elif re.search(nc_pattern, path):
             from eoio.readers.generic_netcdf.reader import NetCDFReader
 
             return NetCDFReader

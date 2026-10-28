@@ -118,17 +118,13 @@ class TestGistdaTheosMetadataExtractor(unittest.TestCase):
 
     def test_get_product_metadata_returns_basic_metadata(self):
         with TemporaryDirectory() as td:
-            extractor = GISTDATHEOSMetadataExtractor(
-                self._make_mock_reader(self._make_minimal_dim(Path(td)))
-            )
+            extractor = GISTDATHEOSMetadataExtractor(self._make_mock_reader(self._make_minimal_dim(Path(td))))
 
             self.assertEqual(extractor.get_product_metadata(), extractor.get_basic_metadata())
 
     def test_get_variable_product_metadata_for_observation_geometry(self):
         with TemporaryDirectory() as td:
-            extractor = GISTDATHEOSMetadataExtractor(
-                self._make_mock_reader(self._make_minimal_dim(Path(td)))
-            )
+            extractor = GISTDATHEOSMetadataExtractor(self._make_mock_reader(self._make_minimal_dim(Path(td))))
 
             self.assertEqual(
                 extractor.get_variable_product_metadata("observation_geometry"),
@@ -137,9 +133,7 @@ class TestGistdaTheosMetadataExtractor(unittest.TestCase):
 
     def test_get_variable_basic_metadata(self):
         with TemporaryDirectory() as td:
-            extractor = GISTDATHEOSMetadataExtractor(
-                self._make_mock_reader(self._make_minimal_dim(Path(td)))
-            )
+            extractor = GISTDATHEOSMetadataExtractor(self._make_mock_reader(self._make_minimal_dim(Path(td))))
 
             self.assertEqual(
                 extractor.get_variable_basic_metadata("B2"),
@@ -157,9 +151,7 @@ class TestGistdaTheosMetadataExtractor(unittest.TestCase):
 
     def test_band_solar_irradiance_and_wavelength_values(self):
         with TemporaryDirectory() as td:
-            extractor = GISTDATHEOSMetadataExtractor(
-                self._make_mock_reader(self._make_minimal_dim(Path(td)))
-            )
+            extractor = GISTDATHEOSMetadataExtractor(self._make_mock_reader(self._make_minimal_dim(Path(td))))
 
             expected = {
                 "B1": (1980.359954, 483.0),

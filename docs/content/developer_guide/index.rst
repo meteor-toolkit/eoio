@@ -15,5 +15,6 @@ examples for contributing to *eoio*.
 
    contributing
    readers/readers
+   writers/writers
    processors/processors
    controlled_vocabulary

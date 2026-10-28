@@ -447,6 +447,21 @@ class TestS2MSIMetadataExtractor(unittest.TestCase):
         md = ex.get_variable_basic_metadata("viewing_azimuth_angle_B02")
         self.assertEqual(md["measurand"], "viewing_azimuth_angle")
 
+        # CF standard names name the quantity, not the band, so they must be identical
+        # across bands (otherwise stacking the bands turns standard_name into a list)
+        # while the long_name still identifies the band.
+        zenith = {
+            ex.get_variable_basic_metadata(f"viewing_zenith_angle_{b}")["standard_name"] for b in ("B01", "B02", "B8A")
+        }
+        azimuth = {
+            ex.get_variable_basic_metadata(f"viewing_azimuth_angle_{b}")["standard_name"] for b in ("B01", "B02", "B8A")
+        }
+        self.assertEqual(zenith, {"sensor_zenith_angle"})
+        self.assertEqual(azimuth, {"sensor_azimuth_angle"})
+        self.assertEqual(
+            ex.get_variable_basic_metadata("viewing_zenith_angle_B02")["long_name"], "viewing zenith angle B02"
+        )
+
         # Regression: solar_zenith_angle and solar_azimuth_angle must have *different*
         # measurand values, not just individually-correct ones. eoio.processors.stack
         # groups variables for stacking by (measurand, dims) -- if both angles shared one

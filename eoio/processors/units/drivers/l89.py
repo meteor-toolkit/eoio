@@ -183,7 +183,7 @@ class LANDSATC2L1UnitDriver(BaseUnitConversionDriver):
                                 )
                         else:
                             # Brightness Temperature (float) = K2/(ln((K1/Radiance)+1)
-                            ds[meas_var] = bnd_k2 / (np.log(bnd_k1 / (ds[meas_var] + 1)))
+                            ds[meas_var] = bnd_k2 / (np.log((bnd_k1 / ds[meas_var]) + 1))
 
                             # Change attributes from to 'brightness_temperature'
                             ds[meas_var].attrs.update(

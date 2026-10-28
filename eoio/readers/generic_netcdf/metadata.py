@@ -1,17 +1,16 @@
 """
-eoio.readers.hypernets.metadata
-==============================
+eoio.readers.generic_netcdf.metadata
+====================================
 
-Metadata extraction utilities for HYPERNETS datasets.
+Metadata extraction for netCDF datasets, shared by the generic netCDF reader and the
+ECMWF reader.
 
-Functions
----------
+Classes
+-------
 .. autosummary::
    :toctree: generated/
 
-   get_product_metadata
-   get_variable_product_metadata
-   get_basic_metadata
+   GenericNetCDFMetadataExtractor
 """
 
 import json
@@ -57,6 +56,10 @@ optional_basic_var_metadata_keys = [
 
 
 class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
+    """
+    Metadata extractor that takes its values from the attributes already in the file.
+    """
+
     def __init__(self, reader, ds: xr.Dataset):
         super().__init__(reader)
         self.ds = ds.copy()
@@ -127,11 +130,27 @@ class GenericNetCDFMetadataExtractor(BaseMetadataExtractor):
             # quotes) that isn't valid JSON. default=str covers subset values that aren't
             # natively JSON-serialisable (e.g. a shapely ROI geometry).
             "eoio:subset": json.dumps(self.subset, default=str) if self.subset else "",
-            "footprint": normalize_footprint(
-                geometry_input=self.ds.attrs.get("product_bounds"),
-                crs_input=self.ds.attrs.get("footprint_crs", None),
-            ),
+            "footprint": self._get_footprint(),
         }
         if "history" in self.ds.attrs:
             basic_md["history"] = self.ds.attrs["history"]
         return basic_md
+
+    def _get_footprint(self) -> dict | None:
+        """
+        Build the canonical footprint from the dataset attributes.
+
+        A ``footprint`` dict, as found in a file written by eoio once its attributes are
+        decoded, is preferred, since it carries the CRS; otherwise the footprint is built
+        from ``product_bounds`` and ``footprint_crs``.
+
+        :returns: Canonical footprint dict, or ``None`` if no geometry is available.
+        """
+        footprint = self.ds.attrs.get("footprint")
+        if isinstance(footprint, dict) and footprint.get("geometry") is not None:
+            return normalize_footprint(geometry_input=footprint["geometry"], crs_input=footprint.get("crs"))
+
+        return normalize_footprint(
+            geometry_input=self.ds.attrs.get("product_bounds"),
+            crs_input=self.ds.attrs.get("footprint_crs", None),
+        )

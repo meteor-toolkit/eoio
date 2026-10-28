@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=2.4,<3",
-    "xarray>=2025.12,<2026",
+    "xarray>=2025.12",
     "pydantic>=2",
     "processor_tools>=0.2.3",
     "obsarray",
@@ -37,6 +37,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+zarr = [
+    "zarr>=3",
+]
 dev = [
     # Pinned: both gate CI. Unpinned, a new release widens the gate under us --
     # ruff 0.16 turned I001/PLR/RUF/BLE/DTZ on by default and reddened CI with
@@ -48,6 +51,8 @@ dev = [
     "pytest-html",
     "pytest-cov",
     "ipython",
+    # Keeps the zarr writer tests running in CI rather than skipping.
+    "zarr>=3",
 ]
 docs = [
     "sphinx",

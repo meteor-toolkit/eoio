@@ -366,13 +366,41 @@ def extract_tarred_file(path: str, path_extracted: Optional[str] = None) -> None
             tar.close()
 
 
+_DEPRECATION_NOTE = (
+    "eoio.utils.read_utils.{name}() is deprecated; use eoio.serialisation.{replacement}() instead. "
+    "The replacement is not a drop-in: it records which codec encoded each attribute, so decoding is "
+    "exact rather than inferred, and it deliberately does not coerce numeric-looking strings "
+    "(product_version='03.01' stays a string rather than becoming 3.01). These functions are kept "
+    "unchanged so existing callers are not silently altered, but they are no longer used by eoio."
+)
+
+
+def _warn_deprecated(name: str, replacement: str) -> None:
+    """
+    Emit the deprecation warning for a superseded attribute helper.
+
+    :param name: Name of the deprecated function.
+    :param replacement: Name of the replacement in ``eoio.serialisation``.
+    """
+    warnings.warn(
+        _DEPRECATION_NOTE.format(name=name, replacement=replacement),
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
 def convert_to_netcdf_compatible(attr: Any) -> Any:
     """
     Converts an attribute to a NetCDF-compatible type.
 
+    .. deprecated::
+        Use :func:`eoio.serialisation.encode_attrs` instead. Note that this function
+        reports ``bool`` as already compatible, which the netCDF4 backend rejects.
+
     :param attr: The attribute to check and convert.
     :returns: A NetCDF-compatible version of the attribute.
     """
+    _warn_deprecated("convert_to_netcdf_compatible", "encode_attrs")
 
     # Check for simple compatible types
     if isinstance(attr, (str, int, float, np.ndarray, list, tuple, bool, type(None))):
@@ -406,9 +434,15 @@ def clean_and_convert_attrs(ds: xr.Dataset) -> xr.Dataset:
     """
     Converts attributes in an xarray Dataset to NetCDF-compatible types.
 
+    .. deprecated::
+        Use :func:`eoio.serialisation.encode_attrs` instead, which also covers
+        coordinate attributes and ``DataTree`` nodes, and records an encoding marker so
+        the values can be restored exactly.
+
     :param ds: The input xarray Dataset.
     :returns: Dataset with attributes converted to NetCDF-compatible types.
     """
+    _warn_deprecated("clean_and_convert_attrs", "encode_attrs")
 
     # Convert global attributes
     for key, value in ds.attrs.items():
@@ -434,10 +468,17 @@ def revert_netcdf_compatible(attr: Any) -> Any:
     """
     Reverts a NetCDF-compatible attribute back to its original type if possible.
 
+    .. deprecated::
+        Use :func:`eoio.serialisation.decode_attrs` instead. This function infers the
+        original type from the encoded value, so it converts any numeric-looking string
+        to a number and any JSON-parseable string to a dict or list, whether or not that
+        was the original type.
+
     :param attr: The attribute to revert.
 
     :returns: The reverted version of the attribute.
     """
+    _warn_deprecated("revert_netcdf_compatible", "decode_attrs")
 
     # Try to convert JSON strings back to dictionaries or lists
     if isinstance(attr, str):
@@ -478,9 +519,15 @@ def revert_and_convert_attrs(ds: xr.Dataset) -> xr.Dataset:
     """
     Converts attributes in an xarray Dataset back to their original types if possible.
 
+    .. deprecated::
+        Use :func:`eoio.serialisation.decode_attrs` instead, which prefers the encoding
+        marker written by eoio's own writers and falls back to a deliberately narrow
+        best-effort decode for files written by anything else.
+
     :param ds: The xarray Dataset to revert attributes in.
     :returns: Dataset with attributes reverted to their original types where possible.
     """
+    _warn_deprecated("revert_and_convert_attrs", "decode_attrs")
 
     # Revert global attributes
     for key, value in ds.attrs.items():

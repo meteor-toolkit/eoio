@@ -190,12 +190,18 @@ class S2MSIMetadataExtractor(BaseMetadataExtractor):
                 basic_metadata["ancillary_variables"] = anc_vars
 
         elif var in ANGLE_VARS:
+            # CF standard names describe the quantity, not the band, so every per-band
+            # viewing angle shares one (the band is in the variable name and long_name).
+            # Using the variable name here made it differ per band, which is not a valid
+            # CF name and turned into a list when the bands were stacked.
             basic_metadata["standard_name"] = var
             basic_metadata["long_name"] = var.replace("_", " ")
             basic_metadata["units"] = "degrees"
             if var.startswith("viewing_zenith"):
+                basic_metadata["standard_name"] = "sensor_zenith_angle"
                 basic_metadata["measurand"] = "viewing_zenith_angle"
             elif var.startswith("viewing_azimuth"):
+                basic_metadata["standard_name"] = "sensor_azimuth_angle"
                 basic_metadata["measurand"] = "viewing_azimuth_angle"
             elif var == "solar_zenith_angle":
                 basic_metadata["measurand"] = "solar_zenith_angle"

@@ -63,6 +63,20 @@ class TestReaderFactory(unittest.TestCase):
         reader = ReaderFactory()
         self.assertEqual(reader.get_reader(path), S2MSIReader)
 
+    def test_get_reader_generic_netcdf(self):
+        from eoio.readers.generic_netcdf.reader import NetCDFReader
+
+        reader = ReaderFactory()
+        for path in ["out.nc", "/data/scratch/my_matchup.nc", "/data/scratch/my_matchup.NC"]:
+            self.assertEqual(reader.get_reader(path), NetCDFReader, path)
+
+    def test_get_reader_generic_netcdf_needs_the_extension(self):
+        """Regression test: the fallback used to match "nc" anywhere in the path."""
+        reader = ReaderFactory()
+        for path in ["/data/ancillary/foo.tif", "/data/sync/foo.csv", "/data/foo.ncx"]:
+            with self.assertRaises(ValueError, msg=path):
+                reader.get_reader(path)
+
     # def test_get_reader_S2L2A(self):
     #     path = "S2_MSIL2A_YYYYMMDDHHMMSS_Nxxyy_ROOO_Txxxxx_YYYYMMDDHHMMSS.SAFE"
     #     reader = ReaderFactory()

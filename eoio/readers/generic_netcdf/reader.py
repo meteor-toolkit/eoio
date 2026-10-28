@@ -1,35 +1,45 @@
 """
-eoio.readers.hypernets.reader
-=============================
+eoio.readers.generic_netcdf.reader
+==================================
 
-Sentinel-2 MSI data reader implementation for HYPERNETS.
+Reader for arbitrary netCDF files.
+
+This is the fallback for any ``.nc`` file that no product-specific reader recognises,
+including files written by :func:`eoio.write`.
+
+Attributes are always decoded with :func:`eoio.serialisation.decode_attrs`, so values eoio
+encoded on write (datetimes, nested dicts, geometries) come back as Python objects. Files
+eoio did not write are decoded on a best-effort basis: strings holding a JSON object or
+array, or an ISO-8601 datetime, are converted and everything else is left as it is.
 
 Classes
 -------
 .. autosummary::
    :toctree: generated/
 
-   HYPERNETSReader
-
-Functions
----------
-.. autosummary::
-   :toctree: generated/
+   NetCDFReader
 """
 
 from __future__ import annotations
 import xarray as xr
 from eoio.readers.generic_netcdf.subset import build_subset
 from eoio.readers.generic_netcdf.data_io import read_dataset
-
-# from eoio.readers.hypernets.aux import maybe_add_aux
 from eoio.readers.generic_netcdf.metadata import GenericNetCDFMetadataExtractor
 from eoio.readers.base import BaseReader
+from eoio.serialisation import decode_attrs
 
 
 class NetCDFReader(BaseReader):
     """
-    Reader for generic NetCDF data.
+    Reader for generic netCDF files.
+
+    Every variable in the file is offered as a measurement variable. No subsetting
+    parameters are accepted, since an arbitrary file cannot be assumed to follow eoio's
+    coordinate naming.
+
+    Readers for specific netCDF products (HYPERNETS, EMIT, ECMWF) subclass this for the
+    source dataset it opens, ``self.ds_src``, but override :meth:`open_dataset`, so the
+    attribute decoding done there applies to this reader only.
     """
 
     def __init__(self, path, vars_sel=None, subset=None, read_params=None):
@@ -41,13 +51,13 @@ class NetCDFReader(BaseReader):
 
     def open_dataset(self) -> xr.Dataset:
         """
-        Open the HYPERNETS dataset as an xarray.Dataset according to the request parameters.
+        Open the netCDF file as an xarray.Dataset according to the request parameters.
 
-        :returns: The opened and subsetted HYPERNETS dataset.
+        :returns: The opened dataset, with attributes decoded.
         """
 
-        # open data
-        ds = self.ds_src.copy()
+        # open data, restoring attributes encoded for serialisation (returns a copy)
+        ds = decode_attrs(self.ds_src)
 
         # Build the subset
         subset = build_subset(
@@ -58,7 +68,7 @@ class NetCDFReader(BaseReader):
         # list variables to include
         include_vars = self.list_include_vars()
 
-        # Read image data if requested
+        # Read data
         ds = read_dataset(
             ds=ds,
             include_vars=include_vars,

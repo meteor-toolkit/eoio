@@ -1,8 +1,8 @@
 """
 eoio.readers.generic_netcdf.subset
-=============================
+==================================
 
-Resolves user-defined subsets for GENERIC_NETCDF images.
+Resolves user-defined subsets for generic netCDF datasets.
 
 Deliberately narrow: an arbitrary netCDF cannot be assumed to name its time
 coordinate ``datetime`` or its spectral coordinate ``wavelength``, nor to carry

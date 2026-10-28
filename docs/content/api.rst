@@ -31,6 +31,16 @@ Creating a Reader
    eoio.readers
 
 
+Creating a Writer
+-----------------
+
+.. autosummary::
+   :toctree: api/
+   :nosignatures:
+
+   eoio.writers
+
+
 Creating a Processor
 --------------------
 
@@ -39,6 +49,17 @@ Creating a Processor
    :nosignatures:
 
    eoio.processors
+
+
+Serialising Attributes
+----------------------
+
+.. autosummary::
+   :toctree: api/
+   :nosignatures:
+   :recursive:
+
+   eoio.serialisation
 
 
 Utils

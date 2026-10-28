@@ -1,23 +1,27 @@
 """eoio.interface - interface functions module"""
 
 import glob
-from typing import Any, Callable, Dict, List, Optional, Union
-import xarray as xr
 import os
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import xarray as xr
 from processor_tools import Context
+
 from eoio.processors.processor_pipeline import ProcessorPipeline
 from eoio.processors.registry import PROCESSOR_REGISTRY
 from eoio.processors.stack._concat import _concat_datasets
 from eoio.readers.factory import ReaderFactory
 from eoio.utils.read_utils import setup_file
+from eoio.writers.factory import WriterFactory
 
 __all__ = [
+    "product_options",
+    "product_processors",
     "read",
     "read_multi",
-    # "product_bounds",
-    "product_processors",
-    # "mid_lon_lat",
-    "product_options",
+    "write",
+    "writer_options",
 ]
 
 
@@ -341,98 +345,122 @@ def read_multi(
     return ds
 
 
-# def write(
-#     path_original: Union[str, List[str]],
-#     correction: Dict[str, Union[float, np.ndarray, int]],
-#     write_params: Optional[Dict[str, Any]] = None,
-# ) -> None:
-#     """
-#     writer function
-#
-#     :param path_original: satellite data product
-#     :param correction: dictionary with band names to be corrected as keys, and either corrected data or bias correction per band as values
-#     :param write_params: definition of desired writing parameters, by default None
-#     """
-#     if isinstance(path_original, str) or len(list(path_original)) == 1:
-#         path_original = [path_original]
-#
-#     for fn in path_original:
-#         with setup_file(fn, write_params) as path:
-#             writer_factory = WriterFactory()
-#
-#             writer = writer_factory.get_writer(path)
-#
-#             writer_obj = writer()
-#
-#             writer_obj.write(path, correction, write_params)
-#
-#
-# def product_bounds(
-#     path: str,
-#     read_params: Optional[Dict[str, Any]] = None,
-#     *args,
-#     **kwargs,
-# ) -> dict:
-#     """
-#     Return coordinate bounds of the product.
-#
-#     Example output:
-#         {
-#             'EPSG:4326':
-#                 [
-#                     [108.60281738078888, 41.52685230104365],
-#                     [109.91862807140421, 41.54675989693983],
-#                     [109.93470404984265, 40.55774811423141],
-#                     [108.63842218519015, 40.5385178383516]],
-#             'EPSG:32649':
-#                 [
-#                     [300000.0, 4600020.0],
-#                     [409810.0, 4600020.0],
-#                     [409810.0, 4490210.0],
-#                     [300000.0, 4490210.0]
-#                 ]
-#         }
-#
-#     :param path: satellite data product
-#     :return: dictionary with coordinate reference system as a key and the corresponding coordinate bounds as values
-#     """
-#     with setup_file(path, read_params) as path:
-#         reader_factory = ReaderFactory()
-#
-#         reader = reader_factory.get_reader(path)
-#
-#         reader_obj = reader(path)
-#
-#         try:
-#             return dict(
-#                 [(k, list(v.exterior.coords)) for k, v in reader_obj.bounds.items()]
-#             )
-#         except AttributeError:
-#             raise ValueError(
-#                 """'product_bounds' cannot be determined from '{}'.
-#             Either the bounds of the product cannot be parsed without reading in
-#             the full product or the reader is not yet fully configured.""".format(
-#                     path
-#                 )
-#             )
-#
-#
-# def mid_lon_lat(
-#     path: str,
-#     *args,
-#     **kwargs,
-# ) -> Tuple[float, float]:
-#     """
-#     Return mid point of satellite product in as a (lon, lat) coordinate
-#
-#     :param path: satellite data product
-#     :return : tuple of the (lon, lat) coordinate for the centre of the satellite product
-#     """
-#     bounds = product_bounds(path, *args, **kwargs)["EPSG:4326"]
-#
-#     lons, lats = [*set([i[0] for i in bounds])], [*set([i[1] for i in bounds])]
-#     lon_0, lon_1, lat_0, lat_1 = min(lons), max(lons), min(lats), max(lats)
-#     return lon_0 + (lon_1 - lon_0) / 2, lat_0 + (lat_1 - lat_0) / 2
+def write(
+    obj: Union[xr.Dataset, xr.DataTree],
+    path: Union[str, Path],
+    writer: str,
+    write_params: Optional[Dict[str, Any]] = None,
+    processors: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+) -> str:
+    """
+    Writes an ``xarray`` object to disk in the requested format.
+
+    :param obj:
+        ``xarray.Dataset`` or ``xarray.DataTree`` to write.
+
+    :param path:
+        Destination path. Missing parent directories are created unless the
+        ``create_parents`` write parameter says otherwise.
+
+    :param writer:
+        Name of the writer to use, e.g. ``"netcdf"`` or ``"zarr"``. Available names
+        can be listed with ``eoio.writers.WriterFactory.list_writers()``.
+
+        Unlike reading, where the format is a property of the file being opened and is
+        detected automatically, the output format is a choice and so must be stated.
+        It is deliberately not guessed from the file extension.
+
+    :param write_params:
+        Optional parameters controlling how the data are written. Which parameters are
+        accepted depends on the writer; inspect them with ``eoio.writer_options``.
+
+        Supported by every writer:
+
+        * ``"encode_attrs"`` (*bool*, default: ``True``) –
+          Encode attributes that the format cannot store natively (nested dictionaries,
+          datetimes, geometries) so that they survive the round trip.
+
+        * ``"on_nonconformance"`` (*str*, default: ``"warn"``) –
+          What to do when the dataset does not conform to CF-1.8 / ACDD / the
+          controlled vocabulary: ``"warn"``, ``"error"`` or ``"ignore"``.
+
+        * ``"update_history"`` (*bool*, default: ``True``) –
+          Record this write in the ``history`` and ``eoio:processing_steps`` attributes.
+
+        * ``"create_parents"`` (*bool*, default: ``True``) –
+          Create missing parent directories of ``path``.
+
+    :param processors:
+        Optional definition of processing steps to apply before writing, in the same
+        form as :func:`read`. Useful for expressing read-transform-write as two calls.
+
+        Unlike in :func:`read`, the processing context's ``path`` is the *destination*
+        ``path`` given here, not a source product - ``write`` is not told where ``obj``
+        came from. A processor that needs the source product should be given it in its
+        own parameters.
+
+    :return:
+        The path written, as a string.
+
+    :raises ValueError: If ``writer`` is not a known writer name.
+    :raises TypeError: If the chosen writer cannot express ``obj``.
+
+    Examples
+    --------
+    .. doctest-skip::
+
+    Write a dataset to netCDF:
+
+    >>> eoio.write(ds, "/path/to/output.nc", writer="netcdf")
+
+    Write to Zarr, appending along ``time`` as new observations arrive. The first
+    call creates the store and later ones extend it:
+
+    >>> for scene in scenes:
+    ...     eoio.write(
+    ...         scene,
+    ...         "/path/to/stack.zarr",
+    ...         writer="zarr",
+    ...         write_params={"append_dim": "time"},
+    ...     )
+    """
+
+    if obj is None:
+        raise TypeError("obj must not be None")
+
+    if path is None:
+        raise TypeError("path must not be None")
+
+    writer_cls = WriterFactory.get_writer(writer)
+    writer_obj = writer_cls(write_params=write_params)
+
+    # Optional pre-write processing, mirroring read()
+    if processors:
+        if not isinstance(obj, xr.Dataset):
+            # Processors are defined as run(ds: xr.Dataset) -> xr.Dataset, so there is
+            # no meaningful way to apply them to a whole tree here. Applying them per
+            # node is the caller's choice to make.
+            raise TypeError(
+                f"processors run on a Dataset, but obj is a {type(obj).__name__}. "
+                "Apply them to the nodes you want before calling write()."
+            )
+        context = Context({"path": str(path)})
+        obj = process(obj, processors, context)
+
+    return writer_obj.write(obj, path)
+
+
+def writer_options(writer: str) -> dict:
+    """
+    Return dictionary of available ``write_params`` options for the requested writer.
+
+    :param writer: Name of the writer, e.g. ``"netcdf"``.
+    :return: Dictionary of available writing parameters.
+    :raises ValueError: If ``writer`` is not a known writer name.
+    """
+    writer_cls = WriterFactory.get_writer(writer)
+
+    return writer_cls().all_options
 
 
 def product_processors(path: str, *args, **kwargs) -> Optional[dict]:
@@ -469,7 +497,9 @@ def product_options(path: str, read_params: Optional[Dict[str, Any]] = None, *ar
 
 
 def process(
-    ds: xr.Dataset, processors: Union[Dict[str, Any], List[Dict[str, Any]]], context: Optional[Context]
+    ds: xr.Dataset,
+    processors: Union[Dict[str, Any], List[Dict[str, Any]]],
+    context: Optional[Context],
 ) -> xr.Dataset:
     """
     Runs a user-defined processing pipeline on an xarray Dataset.
