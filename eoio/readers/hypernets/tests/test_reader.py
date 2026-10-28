@@ -211,7 +211,7 @@ class TestHYPERNETSMeasDef(unittest.TestCase):
                 "solar_zenith_angle": ("series", np.array([20, 30, 40])),
                 "solar_azimuth_angle": ("series", np.array([180, 270, 360])),
                 "acceleration_x_mean": ("series", np.array([0.0, 0.0, 0.0])),
-                "acquisition_time": ("series", np.array([1.0, 2.0, 3.0])),                
+                "acquisition_time": ("series", np.array([1.0, 2.0, 3.0])),
             },
             coords={"wavelength": np.array([400, 500, 600])},
         )
@@ -232,7 +232,7 @@ class TestHYPERNETSMeasDef(unittest.TestCase):
             read_params={"metadata_level": "original", "include_uncertainties": False},
         )
         result_ds = reader.open_dataset()
-        assert list(result_ds.data_vars) == ["radiance","acquisition_time"]
+        assert list(result_ds.data_vars) == ["radiance", "acquisition_time"]
 
     @mock.patch("eoio.readers.generic_netcdf.reader.xr.open_dataset")
     def test_an_aux_variable_is_not_a_measurement(self, mock_open_dataset):
