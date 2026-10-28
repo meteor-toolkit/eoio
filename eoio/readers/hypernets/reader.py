@@ -122,6 +122,9 @@ class HYPERNETSReader(NetCDFReader):
         # list variables to include
         include_vars = self.list_include_vars()
 
+        if "acquisition_time" not in include_vars:
+            include_vars.append("acquisition_time")
+
         # Build the subset
         subset = build_subset(
             ds,

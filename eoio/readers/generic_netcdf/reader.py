@@ -44,9 +44,13 @@ class NetCDFReader(BaseReader):
 
     def __init__(self, path, vars_sel=None, subset=None, read_params=None):
         self.ds_src = xr.open_dataset(path)
-        self.meas_def = {
-            "all": list(self.ds_src.variables),
-        }
+        # Offer every variable in the file as a measurement only if the class declares no
+        # measurement variables of its own - an instance attribute set here would otherwise
+        # shadow a subclass's class-level meas_def (e.g. the HYPERNETS readers').
+        if not self.meas_def.get("all"):
+            self.meas_def = {
+                "all": list(self.ds_src.variables),
+            }
         super().__init__(path, vars_sel, subset, read_params)
 
     def open_dataset(self) -> xr.Dataset:

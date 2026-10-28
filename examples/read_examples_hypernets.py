@@ -43,11 +43,10 @@ L2a_path = r"T:\ECO\EOServer\data\insitu\hypernets\archive\GHNA\2025\06\06\SEQ20
 vars_sel = {
     "meas": [
         "reflectance",
-        "u_rel_systematic_reflectance",
-        "err_corr_systematic_reflectance",
     ],
     "aux": "basic",
 }
+
 subset_dict = {
     "mask": True,
     #"angle": {"vza": {"nearest": 9.9, "tolerance": 1}, "vaa": {"min": 60, "max": 120}},
